@@ -29,10 +29,12 @@ temp/
 *.mp4
 *.mp3
 
-# Models
-models/
+# ML Models (trained models, not Python code)
 *.pt
 *.bin
+*.pth
+*.onnx
+*.h5
 
 # Logs
 *.log
