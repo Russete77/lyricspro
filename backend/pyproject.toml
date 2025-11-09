@@ -1,11 +1,17 @@
-[tool.poetry]
-name = "transcritor-ai-pro"
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transcription-backend"
 version = "1.0.0"
 description = "Sistema avançado de transcrição com IA"
-authors = ["Erick <erick@example.com>"]
+authors = [{name = "Erick", email = "erick@example.com"}]
+requires-python = ">=3.11"
 
-[tool.poetry.dependencies]
-python = "^3.11"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
 
 [tool.black]
 line-length = 100
