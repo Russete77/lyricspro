@@ -1,0 +1,56 @@
+# Dockerfile para Celery Workers
+
+FROM python:3.11-slim
+
+# Variáveis de ambiente
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    C_FORCE_ROOT=true
+
+# Instalar dependências do sistema
+# Incluindo dependências para processamento de áudio/vídeo
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsndfile1 \
+    libsndfile1-dev \
+    gcc \
+    g++ \
+    git \
+    curl \
+    # Dependências para librosa
+    libatlas-base-dev \
+    gfortran \
+    # Dependências para scipy
+    libblas-dev \
+    liblapack-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Diretório de trabalho
+WORKDIR /app
+
+# Copiar requirements
+COPY backend/requirements.txt .
+
+# Instalar dependências Python
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Instalar Flower (monitoramento Celery)
+RUN pip install flower
+
+# Baixar modelos do spaCy
+RUN python -m spacy download pt_core_news_sm
+
+# Copiar código da aplicação
+COPY backend/app /app/app
+
+# Criar diretórios necessários
+RUN mkdir -p /tmp/uploads /tmp/transcriptions /root/.cache
+
+# Volume para cache de modelos
+VOLUME /root/.cache
+
+# Comando padrão (será sobrescrito pelo docker-compose)
+CMD ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--concurrency=2"]

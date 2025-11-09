@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uvicorn app.main:app:*)",
+      "Bash(curl:*)",
+      "Bash(celery:*)",
+      "Bash(npx create-next-app@latest frontend --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --eslint)",
+      "Bash(python:*)",
+      "Bash(xargs kill:*)",
+      "Bash(find:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

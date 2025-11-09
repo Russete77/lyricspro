@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "transcritor-ai-pro"
+version = "1.0.0"
+description = "Sistema avançado de transcrição com IA"
+authors = ["Erick <erick@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+disallow_untyped_defs = true
