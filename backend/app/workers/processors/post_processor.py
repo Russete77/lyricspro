@@ -171,6 +171,13 @@ class PostProcessor:
 
     def _refine_text(self, client, text: str) -> str:
         """Refina o texto usando GPT-4o - CORRIGE ERROS CONTEXTUAIS"""
+        # Log do tamanho do texto
+        text_len = len(text)
+        max_chars = 120000
+        logger.info(f"Texto original: {text_len} caracteres")
+        if text_len > max_chars:
+            logger.warning(f"⚠️  Texto truncado: {text_len} -> {max_chars} caracteres ({text_len - max_chars} perdidos)")
+
         prompt = f"""Você é um especialista em CORREÇÃO de transcrições de áudio em português brasileiro.
 
 OBJETIVO: Corrigir erros de transcrição mantendo 100% fidelidade ao que foi FALADO no áudio.
@@ -208,7 +215,7 @@ PARA MÚSICAS:
 - Se reconhecer a música, use a letra oficial como referência
 
 Texto transcrito (corrija erros usando contexto e conhecimento de músicas brasileiras):
-{text[:50000]}
+{text[:120000]}
 
 Retorne apenas o texto CORRIGIDO, sem explicações."""
 
@@ -241,7 +248,7 @@ Se for PODCAST/PALESTRA, identifique:
 - Seções de discussão
 
 Texto:
-{text[:50000]}
+{text[:120000]}
 
 Retorne um JSON array com a estrutura:
 [{{"title": "Refrão" ou "Verso 1" ou "Introdução", "summary": "Breve descrição"}}]
@@ -273,7 +280,7 @@ Se não houver estrutura clara, retorne array vazio []."""
         """Gera resumo do texto"""
         prompt = f"""Crie um resumo conciso (2-3 parágrafos) desta transcrição:
 
-{text[:50000]}
+{text[:120000]}
 
 Resumo:"""
 
@@ -299,7 +306,7 @@ Resumo:"""
 2. Tópicos abordados (3-5 tópicos)
 
 Texto:
-{text[:50000]}
+{text[:120000]}
 
 Retorne JSON:
 {{
