@@ -25,8 +25,10 @@ from app.workers.processors.diarizer import Diarizer
 from app.workers.processors.transcriber import Transcriber
 from app.workers.processors.punctuator import Punctuator
 from app.workers.processors.post_processor import PostProcessor
+from app.services.storage import get_storage_service
 
 logger = logging.getLogger(__name__)
+storage = get_storage_service()
 
 
 class TranscriptionTask(Task):
@@ -62,7 +64,7 @@ class TranscriptionTask(Task):
 def process_transcription(
     self,
     job_id: str,
-    file_path: str,
+    storage_object_name: str,
     config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
@@ -70,7 +72,7 @@ def process_transcription(
 
     Args:
         job_id: UUID da transcrição
-        file_path: Caminho do arquivo original
+        storage_object_name: Nome do objeto no R2 Storage
         config: Configurações de processamento
 
     Returns:
@@ -97,6 +99,14 @@ def process_transcription(
         db.commit()
 
         logger.info(f"[{job_id}] Iniciando pipeline de transcrição")
+
+        # Baixar arquivo do R2
+        file_ext = Path(storage_object_name).suffix
+        file_path = temp_dir / f"original{file_ext}"
+
+        logger.info(f"[{job_id}] Baixando arquivo do R2: {storage_object_name}")
+        storage.download_file(storage_object_name, file_path)
+        logger.info(f"[{job_id}] Arquivo baixado: {file_path}")
 
         # =================================================================
         # STAGE 1: Extração de Áudio (0-15%)

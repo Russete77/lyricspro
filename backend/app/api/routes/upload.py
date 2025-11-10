@@ -13,10 +13,12 @@ from app.config import get_settings
 from app.models.transcription import Transcription
 from app.models.schemas import TranscriptionCreateResponse
 from app.workers.tasks import process_transcription
+from app.services.storage import get_storage_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+storage = get_storage_service()
 
 
 @router.post("/transcriptions/upload", response_model=TranscriptionCreateResponse, status_code=201)
@@ -76,22 +78,37 @@ async def upload_transcription(
     # Gerar ID único
     job_id = str(uuid.uuid4())
 
-    # Salvar arquivo temporariamente
+    # Salvar arquivo temporariamente local e fazer upload para R2
     upload_dir = Path("/tmp/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    file_path = upload_dir / f"{job_id}.{file_ext}"
+    temp_file_path = upload_dir / f"{job_id}.{file_ext}"
+    storage_object_name = f"uploads/{job_id}.{file_ext}"
 
     try:
-        # Salvar arquivo
-        with open(file_path, "wb") as f:
+        # Salvar arquivo temporário
+        with open(temp_file_path, "wb") as f:
             content = await file.read()
             f.write(content)
 
-        logger.info(f"Arquivo salvo: {file_path} ({file_size} bytes)")
+        logger.info(f"Arquivo salvo temporariamente: {temp_file_path} ({file_size} bytes)")
+
+        # Fazer upload para R2
+        storage_url = storage.upload_file(
+            file_path=temp_file_path,
+            object_name=storage_object_name,
+            content_type=file.content_type
+        )
+
+        logger.info(f"Arquivo enviado para R2: {storage_object_name}")
+
+        # Remover arquivo temporário local
+        temp_file_path.unlink()
 
     except Exception as e:
-        logger.error(f"Erro ao salvar arquivo: {e}")
+        logger.error(f"Erro ao processar upload: {e}")
+        if temp_file_path.exists():
+            temp_file_path.unlink()
         raise HTTPException(status_code=500, detail="Erro ao processar upload")
 
     # Criar registro no banco
@@ -101,7 +118,7 @@ async def upload_transcription(
         original_filename=file.filename,
         file_type=file_type,
         file_size=file_size,
-        storage_path=str(file_path),
+        storage_path=storage_object_name,  # Salvar nome do objeto no R2
         language=language,
         model_size=model_size,
         enable_diarization=enable_diarization,
@@ -127,7 +144,8 @@ async def upload_transcription(
     }
 
     try:
-        process_transcription.delay(job_id, str(file_path), config)
+        # Passar nome do objeto no R2 em vez de caminho local
+        process_transcription.delay(job_id, storage_object_name, config)
         logger.info(f"Job enviado para processamento: {job_id}")
     except Exception as e:
         logger.error(f"Erro ao enviar job para fila: {e}")
