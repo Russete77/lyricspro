@@ -208,7 +208,7 @@ PARA MÚSICAS:
 - Se reconhecer a música, use a letra oficial como referência
 
 Texto transcrito (corrija erros usando contexto e conhecimento de músicas brasileiras):
-{text[:4000]}
+{text[:50000]}
 
 Retorne apenas o texto CORRIGIDO, sem explicações."""
 
@@ -241,7 +241,7 @@ Se for PODCAST/PALESTRA, identifique:
 - Seções de discussão
 
 Texto:
-{text[:4000]}
+{text[:50000]}
 
 Retorne um JSON array com a estrutura:
 [{{"title": "Refrão" ou "Verso 1" ou "Introdução", "summary": "Breve descrição"}}]
@@ -273,7 +273,7 @@ Se não houver estrutura clara, retorne array vazio []."""
         """Gera resumo do texto"""
         prompt = f"""Crie um resumo conciso (2-3 parágrafos) desta transcrição:
 
-{text[:4000]}
+{text[:50000]}
 
 Resumo:"""
 
@@ -299,7 +299,7 @@ Resumo:"""
 2. Tópicos abordados (3-5 tópicos)
 
 Texto:
-{text[:4000]}
+{text[:50000]}
 
 Retorne JSON:
 {{

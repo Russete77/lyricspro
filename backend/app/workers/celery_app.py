@@ -25,6 +25,25 @@ celery_app.conf.update(
     task_soft_time_limit=7000,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=settings.celery_max_tasks_per_child,
+
+    # Configurações para lidar com quedas de conexão Redis
+    broker_connection_retry=True,
+    broker_connection_retry_on_startup=True,
+    broker_connection_max_retries=10,
+    broker_pool_limit=10,
+    broker_heartbeat=30,
+    broker_heartbeat_checkrate=2,
+
+    # Worker deve cancelar tarefas em andamento quando perder conexão
+    worker_cancel_long_running_tasks_on_connection_loss=True,
+
+    # Redis connection pool settings
+    redis_socket_keepalive=True,
+    redis_socket_keepalive_options={
+        1: 1,   # TCP_KEEPIDLE
+        2: 1,   # TCP_KEEPINTVL
+        3: 3    # TCP_KEEPCNT
+    },
 )
 
 # Configurar filas
