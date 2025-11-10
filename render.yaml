@@ -29,7 +29,7 @@ services:
       - key: DEBUG
         value: false
       - key: CORS_ORIGINS
-        value: https://transcription-pro.vercel.app,http://localhost:3000
+        value: https://lyricspro.vercel.app,http://localhost:3000
       - key: WHISPER_MODEL_SIZE
         value: large-v3
       - key: WHISPER_DEVICE
