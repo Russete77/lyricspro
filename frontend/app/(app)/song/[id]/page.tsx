@@ -11,6 +11,13 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { usePolling } from '@/hooks/usePolling';
 import { useToast } from '@/components/ui/Toast';
 import { formatDuration, formatRelativeTime } from '@/lib/utils';
+import {
+  getTranscriptionStatus,
+  downloadTranscriptionTXT,
+  downloadTranscriptionJSON,
+  downloadTranscriptionSRT,
+  downloadTranscriptionVTT
+} from '@/lib/api';
 import type { TranscriptionStatusResponse } from '@/lib/types';
 
 export default function SongDetailPage() {
@@ -47,13 +54,8 @@ export default function SongDetailPage() {
     if (!isProcessing && !transcription) {
       const fetchTranscription = async () => {
         try {
-          const response = await fetch(`http://localhost:8001/api/v1/transcriptions/${jobId}`);
-          if (response.ok) {
-            const data = await response.json();
-            setTranscription(data);
-          } else {
-            console.error('Erro ao buscar transcrição:', response.statusText);
-          }
+          const data = await getTranscriptionStatus(jobId);
+          setTranscription(data);
         } catch (error) {
           console.error('Erro ao buscar transcrição:', error);
         }
@@ -64,38 +66,33 @@ export default function SongDetailPage() {
 
   const handleDownload = async (format: string) => {
     try {
-      const response = await fetch(
-        `http://localhost:8001/api/v1/transcriptions/${jobId}/download?format=${format}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Falha no download');
-      }
-
-      const data = await response.json();
-
-      // Extrair conteúdo baseado no formato
+      let data: any;
       let content = '';
       let mimeType = '';
       let extension = '';
 
+      // Buscar dados usando as funções da API
       switch (format) {
         case 'txt':
+          data = await downloadTranscriptionTXT(jobId);
           content = data.text;
           mimeType = 'text/plain';
           extension = 'txt';
           break;
         case 'json':
+          data = await downloadTranscriptionJSON(jobId);
           content = JSON.stringify(data, null, 2);
           mimeType = 'application/json';
           extension = 'json';
           break;
         case 'srt':
+          data = await downloadTranscriptionSRT(jobId);
           content = data.srt;
           mimeType = 'text/plain';
           extension = 'srt';
           break;
         case 'vtt':
+          data = await downloadTranscriptionVTT(jobId);
           content = data.vtt;
           mimeType = 'text/vtt';
           extension = 'vtt';
