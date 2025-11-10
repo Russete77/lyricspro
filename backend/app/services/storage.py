@@ -46,7 +46,7 @@ class StorageService:
                     secure=self.settings.storage_secure
                 )
                 self.bucket = self.settings.storage_bucket
-                self._ensure_bucket_exists()
+                # Não verifica se bucket existe - assume que já foi criado
                 logger.info(f"StorageService inicializado (MINIO): {self.settings.storage_endpoint}/{self.bucket}")
             except ImportError:
                 logger.warning("minio não instalado, usando storage local")
