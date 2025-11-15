@@ -97,7 +97,11 @@ export async function getSignedUploadUrl(
     ContentType: contentType,
   });
 
-  return await getSignedUrl(client, command, { expiresIn });
+  // Gerar URL assinada sem checksums automáticos
+  return await getSignedUrl(client, command, {
+    expiresIn,
+    unhoistableHeaders: new Set(['x-amz-checksum-crc32']),
+  });
 }
 
 /**
