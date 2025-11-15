@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { LyricViewer } from '@/components/ui/LyricViewer';
+import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
+import { AudioPlayer } from '@/components/ui/AudioPlayer';
 import { ProcessingStatus } from '@/components/ui/ProcessingStatus';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -30,6 +32,8 @@ export default function SongDetailPage() {
   const isProcessing = searchParams.get('processing') === 'true';
 
   const [transcription, setTranscription] = useState<TranscriptionStatusResponse | null>(null);
+  const [viewMode, setViewMode] = useState<'synced' | 'edit'>('synced');
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Polling se estiver processando
   const { data, isLoading } = usePolling({
@@ -124,7 +128,8 @@ export default function SongDetailPage() {
     success('Link copiado para a área de transferência!');
   };
 
-  if (isLoading || !transcription) {
+  // Só mostra skeleton se está carregando E não tem dados ainda
+  if ((isLoading && !transcription) || !transcription) {
     return (
       <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-0">
         <div className="h-12 w-3/4 bg-white/10 rounded-xl animate-pulse"></div>
@@ -253,7 +258,7 @@ export default function SongDetailPage() {
       </div>
 
       {/* Downloads */}
-      {transcription.exports.length > 0 && (
+      {transcription.exports && transcription.exports.length > 0 && (
         <Card id="downloads">
           <CardHeader>
             <CardTitle>Baixar Transcrição</CardTitle>
@@ -279,32 +284,100 @@ export default function SongDetailPage() {
         </Card>
       )}
 
-      {/* Lyrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Letra Transcrita</CardTitle>
-          <CardDescription>Clique para editar o texto da transcrição</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <LyricViewer
-            lyrics={transcription.transcription_text || ''}
-            editable={true}
-            onEdit={(newLyrics) => {
-              // Atualizar o estado local imediatamente
-              setTranscription({
-                ...transcription,
-                transcription_text: newLyrics,
-              });
+      {/* Audio Player */}
+      {transcription.storage_path && (
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle>Áudio Original</CardTitle>
+                <CardDescription>Reproduza o áudio original para conferir a transcrição</CardDescription>
+              </div>
 
-              // TODO: Implementar chamada API para salvar no backend
-              // await updateTranscription(jobId, { transcription_text: newLyrics });
+              {/* Toggle View Mode */}
+              {transcription.segments && transcription.segments.length > 0 && (
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant={viewMode === 'synced' ? 'gradient' : 'outline'}
+                    onClick={() => setViewMode('synced')}
+                    className={viewMode !== 'synced' ? 'bg-white/5 border-white/10 text-white/80' : ''}
+                  >
+                    <svg className="w-4 h-4 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="hidden sm:inline">Sincronizado</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={viewMode === 'edit' ? 'gradient' : 'outline'}
+                    onClick={() => setViewMode('edit')}
+                    className={viewMode !== 'edit' ? 'bg-white/5 border-white/10 text-white/80' : ''}
+                  >
+                    <svg className="w-4 h-4 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span className="hidden sm:inline">Editar</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {/* Custom Audio Player */}
+            <AudioPlayer
+              src={`/api/transcriptions/${jobId}/audio`}
+              audioRef={audioRef}
+            />
 
-              console.log('Salvando edições:', newLyrics);
-              success('Alterações salvas localmente! (Backend API pendente)');
-            }}
-          />
-        </CardContent>
-      </Card>
+            {/* Synced Lyrics View */}
+            {viewMode === 'synced' && transcription.segments && transcription.segments.length > 0 && (
+              <div className="mt-6">
+                <SyncedLyrics
+                  segments={transcription.segments}
+                  audioRef={audioRef}
+                  onSegmentClick={(startTime) => {
+                    if (audioRef.current) {
+                      audioRef.current.currentTime = startTime;
+                      audioRef.current.play();
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Lyrics - Mostrar apenas no modo Edit */}
+      {viewMode === 'edit' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Letra Transcrita</CardTitle>
+            <CardDescription>Clique para editar o texto da transcrição</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LyricViewer
+              lyrics={transcription.transcription_text || ''}
+              editable={true}
+              onEdit={(newLyrics) => {
+                // Atualizar o estado local imediatamente
+                setTranscription({
+                  ...transcription,
+                  transcription_text: newLyrics,
+                });
+
+                // TODO: Implementar chamada API para salvar no backend
+                // await updateTranscription(jobId, { transcription_text: newLyrics });
+
+                console.log('Salvando edições:', newLyrics);
+                success('Alterações salvas localmente! (Backend API pendente)');
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,0 +1,117 @@
+// Prisma Schema - TranscritorAI Pro
+// Migrado de SQLAlchemy models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transcription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+
+  // Arquivo original
+  originalFilename String  @map("original_filename")
+  fileType         String  @map("file_type") // 'video' ou 'audio'
+  fileSize         BigInt  @map("file_size")
+  duration         Float?
+  storagePath      String  @map("storage_path")
+
+  // Status do processamento
+  status         String  @default("pending") // pending, processing, completed, failed
+  progress       Int     @default(0) // 0-100
+  currentStage   String? @map("current_stage")
+  errorMessage   String? @map("error_message")
+
+  // Configurações
+  language              String  @default("pt")
+  modelSize             String  @default("gpt-4o-transcribe-diarize") @map("model_size")
+  enableDiarization     Boolean @default(false) @map("enable_diarization")
+  enablePostProcessing  Boolean @default(true) @map("enable_post_processing")
+
+  // Resultados
+  transcriptionText String? @map("transcription_text")
+  wordCount         Int?    @map("word_count")
+  averageConfidence Float?  @map("average_confidence")
+  detectedLanguage  String? @map("detected_language")
+  speakerCount      Int?    @map("speaker_count")
+
+  // Metadados
+  processingTimeSeconds Float?  @map("processing_time_seconds")
+  gpuUsed               Boolean @default(false) @map("gpu_used")
+  costCredits           Float   @default(0) @map("cost_credits")
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Relationships
+  segments TranscriptionSegment[]
+  chapters TranscriptionChapter[]
+  exports  TranscriptionExport[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transcriptions")
+}
+
+model TranscriptionSegment {
+  id              String   @id @default(uuid())
+  transcriptionId String   @map("transcription_id")
+
+  segmentIndex  Int     @map("segment_index")
+  startTime     Float   @map("start_time")
+  endTime       Float   @map("end_time")
+  text          String
+  confidence    Float?
+  speakerLabel  String? @map("speaker_label")
+
+  // Word-level timestamps (JSON)
+  words Json?
+
+  // Relationship
+  transcription Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+  @@map("transcription_segments")
+}
+
+model TranscriptionChapter {
+  id              String   @id @default(uuid())
+  transcriptionId String   @map("transcription_id")
+
+  chapterIndex Int     @map("chapter_index")
+  title        String
+  startTime    Float   @map("start_time")
+  endTime      Float   @map("end_time")
+  summary      String?
+
+  // Relationship
+  transcription Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+  @@map("transcription_chapters")
+}
+
+model TranscriptionExport {
+  id              String   @id @default(uuid())
+  transcriptionId String   @map("transcription_id")
+
+  format   String  // 'txt', 'srt', 'vtt', 'json'
+  filePath String  @map("file_path")
+  fileSize BigInt  @map("file_size")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationship
+  transcription Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+  @@map("transcription_exports")
+}

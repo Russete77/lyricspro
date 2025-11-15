@@ -39,10 +39,13 @@ export function usePolling({
     if (!jobId) return;
 
     try {
-      setIsLoading(true);
+      // Só mostra loading na primeira vez
+      setIsLoading((prev) => (data === null ? true : prev));
       setError(null);
 
+      console.log('[usePolling] Buscando status para job:', jobId);
       const status = await getTranscriptionStatus(jobId);
+      console.log('[usePolling] Status recebido:', status);
 
       if (!mountedRef.current) return;
 

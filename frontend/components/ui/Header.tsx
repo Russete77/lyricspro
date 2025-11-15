@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -52,9 +53,24 @@ export function Header() {
             })}
           </nav>
 
-          {/* User area (can add user menu here) */}
-          <div className="flex items-center gap-2 w-32">
-            {/* Placeholder for future user menu */}
+          {/* User area */}
+          <div className="flex items-center gap-3">
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="px-5 py-2.5 rounded-xl font-medium text-white bg-brand-primary hover:bg-brand-primary/90 transition-all duration-300">
+                  Entrar
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-10 h-10",
+                  },
+                }}
+              />
+            </SignedIn>
           </div>
         </div>
       </div>

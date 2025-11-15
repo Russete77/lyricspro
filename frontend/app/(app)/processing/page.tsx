@@ -22,8 +22,8 @@ export default function ProcessingPage() {
       });
 
       const processingSongs: Song[] = response.items
-        .filter((t) => t.status === 'processing' || t.status === 'pending')
-        .map((t) => ({
+        .filter((t: any) => t.status === 'processing' || t.status === 'pending')
+        .map((t: any) => ({
           id: t.id,
           title: t.title || `Transcrição ${t.id.slice(0, 8)}`,
           status: t.status as TranscriptionStatus,

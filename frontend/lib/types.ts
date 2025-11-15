@@ -16,6 +16,7 @@ export interface TranscriptionCreateRequest {
 }
 
 export interface TranscriptionCreateResponse {
+  id: string; // ID da transcrição
   job_id: string;
   status: string;
   estimated_time_minutes: number;
@@ -46,6 +47,13 @@ export interface TranscriptionStatusResponse {
   word_count: number | null;
   duration: number | null; // segundos
   speaker_count: number | null;
+  storage_path: string | null; // Caminho do arquivo de áudio
+
+  // Segmentos (para karaoke)
+  segments: TranscriptionSegment[];
+
+  // Capítulos (estrutura musical)
+  chapters?: TranscriptionChapter[];
 
   // Downloads disponíveis
   exports: ExportFormat[];

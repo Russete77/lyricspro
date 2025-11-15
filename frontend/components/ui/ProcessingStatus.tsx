@@ -4,14 +4,9 @@ import { Progress } from './Progress';
 import { cn } from '@/lib/utils';
 
 const STAGES = [
-  { id: 'upload', label: 'Upload', range: [0, 5] },
-  { id: 'audio_extraction', label: 'Extração de Áudio', range: [5, 15] },
-  { id: 'noise_reduction', label: 'Redução de Ruído', range: [15, 25] },
-  { id: 'vocal_separation', label: 'Separação Vocal', range: [25, 35] },
-  { id: 'transcription', label: 'Transcrição', range: [35, 75] },
-  { id: 'punctuation', label: 'Pontuação', range: [75, 85] },
-  { id: 'post_processing', label: 'Pós-processamento', range: [85, 95] },
-  { id: 'finalization', label: 'Finalização', range: [95, 100] },
+  { id: 'starting', label: 'Iniciando', range: [0, 25] },
+  { id: 'transcription', label: 'Transcrevendo Áudio', range: [25, 50] },
+  { id: 'post_processing', label: 'Corrigindo Texto', range: [50, 100] },
 ];
 
 interface ProcessingStatusProps {

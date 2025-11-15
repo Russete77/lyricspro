@@ -15,7 +15,7 @@ interface MusicUploaderProps {
 
 export function MusicUploader({
   onFileSelect,
-  maxSizeMB = 100,
+  maxSizeMB = 500,
   acceptedFormats = ['mp3', 'wav', 'm4a', 'mp4', 'avi', 'mov', 'mkv', 'webm', 'ogg', 'flac'],
   uploadProgress,
   isUploading,

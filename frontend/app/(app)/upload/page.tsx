@@ -62,7 +62,7 @@ export default function UploadPage() {
 
       // Redirecionar para página de processamento
       setTimeout(() => {
-        router.push(`/song/${response.job_id}?processing=true`);
+        router.push(`/song/${response.id}?processing=true`);
       }, 1000);
     } catch (err) {
       showErrorToast(error || 'Erro ao fazer upload');
@@ -125,7 +125,7 @@ export default function UploadPage() {
               onFileSelect={handleFileSelect}
               uploadProgress={uploadProgress}
               isUploading={isUploading}
-              maxSizeMB={100}
+              maxSizeMB={500}
             />
           ) : (
             <AudioRecorder

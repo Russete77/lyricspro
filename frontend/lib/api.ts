@@ -1,6 +1,6 @@
 /**
- * Cliente HTTP para comunicação com Backend FastAPI
- * Base URL: http://localhost:8000 (desenvolvimento)
+ * Cliente HTTP para comunicação com Next.js API Routes
+ * Base URL: http://localhost:3000 (desenvolvimento)
  */
 
 import type {
@@ -14,7 +14,7 @@ import type {
   DownloadVTTResponse,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 /**
  * Helper para fazer requests HTTP
@@ -116,7 +116,7 @@ export async function uploadFile(
       reject(new Error("Upload aborted"));
     });
 
-    xhr.open("POST", `${API_BASE_URL}/api/v1/transcriptions/upload`);
+    xhr.open("POST", `${API_BASE_URL}/api/transcriptions/upload`);
     xhr.send(formData);
   });
 }
@@ -127,7 +127,7 @@ export async function uploadFile(
 export async function getTranscriptionStatus(
   jobId: string
 ): Promise<TranscriptionStatusResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}`);
+  return fetchAPI(`/api/transcriptions/${jobId}`);
 }
 
 /**
@@ -136,7 +136,12 @@ export async function getTranscriptionStatus(
 export async function getTranscriptionSegments(
   jobId: string
 ): Promise<TranscriptionSegmentsResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}/segments`);
+  // Segmentos agora vêm junto com o status
+  const status = await getTranscriptionStatus(jobId);
+  return {
+    segments: status.segments || [],
+    total_segments: status.segments?.length || 0,
+  };
 }
 
 /**
@@ -145,7 +150,11 @@ export async function getTranscriptionSegments(
 export async function getTranscriptionChapters(
   jobId: string
 ): Promise<TranscriptionChaptersResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}/chapters`);
+  // Capítulos agora vêm junto com o status
+  const status = await getTranscriptionStatus(jobId);
+  return {
+    chapters: status.chapters || [],
+  };
 }
 
 /**
@@ -154,7 +163,10 @@ export async function getTranscriptionChapters(
 export async function downloadTranscriptionTXT(
   jobId: string
 ): Promise<DownloadTextResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}/download?format=txt`);
+  const response = await fetch(`${API_BASE_URL}/api/transcriptions/${jobId}/download?format=txt`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const text = await response.text();
+  return { text };
 }
 
 /**
@@ -163,7 +175,7 @@ export async function downloadTranscriptionTXT(
 export async function downloadTranscriptionJSON(
   jobId: string
 ): Promise<DownloadJSONResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}/download?format=json`);
+  return fetchAPI(`/api/transcriptions/${jobId}/download?format=json`);
 }
 
 /**
@@ -172,7 +184,10 @@ export async function downloadTranscriptionJSON(
 export async function downloadTranscriptionSRT(
   jobId: string
 ): Promise<DownloadSRTResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}/download?format=srt`);
+  const response = await fetch(`${API_BASE_URL}/api/transcriptions/${jobId}/download?format=srt`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const srt = await response.text();
+  return { srt };
 }
 
 /**
@@ -181,30 +196,10 @@ export async function downloadTranscriptionSRT(
 export async function downloadTranscriptionVTT(
   jobId: string
 ): Promise<DownloadVTTResponse> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}/download?format=vtt`);
-}
-
-/**
- * Health check da API
- */
-export async function checkHealth(): Promise<{ status: string }> {
-  return fetchAPI("/api/health");
-}
-
-/**
- * Informações da API
- */
-export async function getAPIInfo(): Promise<{
-  version: string;
-  whisper_model: string;
-  whisper_device: string;
-  diarization_enabled: boolean;
-  post_processing_enabled: boolean;
-  max_file_size_mb: number;
-  max_duration_minutes: number;
-  allowed_formats: string[];
-}> {
-  return fetchAPI("/api/info");
+  const response = await fetch(`${API_BASE_URL}/api/transcriptions/${jobId}/download?format=vtt`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const vtt = await response.text();
+  return { vtt };
 }
 
 /**
@@ -217,13 +212,13 @@ export async function listTranscriptions(options: {
 } = {}): Promise<{
   items: Array<{
     id: string;
-    title: string;
+    original_filename: string;
     status: string;
     progress: number;
-    duration: number | null;
-    created_at: string | null;
+    file_type: string;
+    file_size: number;
+    created_at: string;
     completed_at: string | null;
-    preview: string | null;
   }>;
   total: number;
   limit: number;
@@ -235,14 +230,14 @@ export async function listTranscriptions(options: {
   if (options.status) params.append('status', options.status);
 
   const query = params.toString();
-  return fetchAPI(`/api/v1/transcriptions${query ? `?${query}` : ''}`);
+  return fetchAPI(`/api/transcriptions${query ? `?${query}` : ''}`);
 }
 
 /**
  * Deleta uma transcrição
  */
-export async function deleteTranscription(jobId: string): Promise<{message: string}> {
-  return fetchAPI(`/api/v1/transcriptions/${jobId}`, {
+export async function deleteTranscription(jobId: string): Promise<{success: boolean}> {
+  return fetchAPI(`/api/transcriptions/${jobId}`, {
     method: 'DELETE'
   });
 }

@@ -1,319 +1,417 @@
-# TranscritorAI Pro 🎤
+# 🎵 LyricsPro - Transcrição Inteligente de Áudio
 
-Sistema avançado de transcrição de áudio/vídeo com IA, otimizado para português brasileiro.
-
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)](https://fastapi.tiangolo.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## 🚀 Features
-
-- **🎯 Transcrição de Alta Qualidade** - Usando faster-whisper (otimizado)
-- **👥 Diarização** - Identificação automática de múltiplos speakers
-- **🤖 Pós-processamento com IA** - Refinamento usando GPT-4o
-- **📝 Pontuação Automática** - Detecção inteligente de pontuação
-- **🎬 Detecção de Capítulos** - Segmentação automática de conteúdo
-- **📊 Múltiplos Formatos** - Exportação em TXT, SRT, VTT, JSON
-- **⚡ Processamento Assíncrono** - Celery + Redis para jobs paralelos
-- **🐳 Docker Ready** - Containerização completa
-- **📈 Escalável** - Arquitetura de microserviços
-
-## 📋 Casos de Uso
-
-- Transcrição de vídeos para cursos online
-- Geração automática de legendas
-- Atas de reuniões e conferências
-- Podcasts e entrevistas
-- Conteúdo educacional
-- Acessibilidade (legendas para surdos)
-
-## 🏗️ Arquitetura
-
-```
-┌─────────────┐
-│   CLIENT    │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│   FastAPI   │ ← API Gateway
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Redis Queue │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────────────────────┐
-│     Celery Workers              │
-│  ┌──────────────────────────┐   │
-│  │ 1. Audio Extraction      │   │
-│  │ 2. Noise Reduction       │   │
-│  │ 3. Diarization           │   │
-│  │ 4. Transcription         │   │
-│  │ 5. Punctuation           │   │
-│  │ 6. Post-processing       │   │
-│  │ 7. Export                │   │
-│  └──────────────────────────┘   │
-└─────────────────────────────────┘
-       │
-       ▼
-┌─────────────┐
-│  Storage    │
-│  + Database │
-└─────────────┘
-```
-
-## 🛠️ Stack Tecnológica
-
-### Backend
-- **Python 3.11+**
-- **FastAPI** - API REST moderna e rápida
-- **Celery** - Processamento assíncrono
-- **Redis** - Fila de jobs
-- **PostgreSQL** - Banco de dados relacional
-- **SQLAlchemy** - ORM
-
-### Processamento
-- **faster-whisper** - Transcrição otimizada
-- **pyannote.audio** - Diarização
-- **FFmpeg** - Conversão de mídia
-- **noisereduce** - Redução de ruído
-- **librosa** - Análise de áudio
-
-### IA e NLP
-- **OpenAI GPT-4o** - Pós-processamento
-- **deepmultilingualpunctuation** - Pontuação
-- **spaCy** - NLP para PT-BR
-
-### Storage
-- **MinIO/S3** - Object storage
-- **Local filesystem** - Cache temporário
-
-## 📦 Instalação
-
-### Opção 1: Instalação Local
-
-#### Requisitos
-
-- Python 3.11+
-- FFmpeg
-- PostgreSQL 14+
-- Redis 7+
-
-#### Passo a Passo
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/transcritor-ai-pro.git
-cd transcritor-ai-pro
-
-# 2. Execute o script de setup
-cd scripts
-chmod +x setup.sh
-./setup.sh
-
-# 3. Configure as variáveis de ambiente
-cd ../backend
-cp .env.example .env
-# Edite .env com suas configurações
-
-# 4. Download dos modelos de IA
-cd ..
-python scripts/download_models.py
-
-# 5. Inicie os serviços (em terminais separados)
-
-# Terminal 1: API
-cd backend
-source venv/bin/activate
-uvicorn app.main:app --reload
-
-# Terminal 2: Worker
-celery -A app.workers.celery_app worker --loglevel=info
-
-# Terminal 3: Flower (monitoramento, opcional)
-celery -A app.workers.celery_app flower
-```
-
-### Opção 2: Docker (Recomendado)
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/transcritor-ai-pro.git
-cd transcritor-ai-pro
-
-# 2. Configure .env
-cp backend/.env.example backend/.env
-# Edite backend/.env
-
-# 3. Inicie com Docker Compose
-docker-compose up -d
-
-# 4. Verifique os logs
-docker-compose logs -f
-
-# 5. Acesse a documentação
-# http://localhost:8000/docs
-```
-
-## 🚀 Uso Rápido
-
-### 1. Upload de Arquivo
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/transcriptions/upload" \
-  -F "file=@video.mp4" \
-  -F "language=pt" \
-  -F "enable_diarization=true" \
-  -F "enable_post_processing=true"
-```
-
-Resposta:
-```json
-{
-  "job_id": "123e4567-e89b-12d3-a456-426614174000",
-  "status": "pending",
-  "estimated_time_minutes": 5.2,
-  "message": "Transcrição iniciada com sucesso"
-}
-```
-
-### 2. Verificar Status
-
-```bash
-curl "http://localhost:8000/api/v1/transcriptions/{job_id}"
-```
-
-### 3. Download do Resultado
-
-```bash
-# Texto puro
-curl "http://localhost:8000/api/v1/transcriptions/{job_id}/download?format=txt"
-
-# Legendas SRT
-curl "http://localhost:8000/api/v1/transcriptions/{job_id}/download?format=srt"
-
-# JSON completo
-curl "http://localhost:8000/api/v1/transcriptions/{job_id}/download?format=json"
-```
-
-## 📚 Documentação
-
-- **[API Documentation](docs/API.md)** - Referência completa da API
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Guia de deploy em produção
-- **[Interactive Docs](http://localhost:8000/docs)** - Swagger UI (quando rodando)
-
-## ⚙️ Configuração
-
-### Variáveis de Ambiente Principais
-
-```env
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/transcritor_ai
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# Whisper
-WHISPER_MODEL_SIZE=large-v3
-WHISPER_DEVICE=cuda  # ou 'cpu'
-
-# OpenAI (opcional)
-OPENAI_API_KEY=sk-...
-
-# Pyannote (opcional, para diarização)
-PYANNOTE_AUTH_TOKEN=hf_...
-```
-
-Ver [.env.example](backend/.env.example) para lista completa.
-
-## 🎯 Modelos Disponíveis
-
-### Whisper Models
-
-| Modelo | Tamanho | Qualidade | Velocidade | GPU Recomendada |
-|--------|---------|-----------|------------|-----------------|
-| tiny   | 39 MB   | ⭐⭐       | ⚡⚡⚡        | Não necessária  |
-| base   | 74 MB   | ⭐⭐⭐      | ⚡⚡⚡        | Não necessária  |
-| small  | 244 MB  | ⭐⭐⭐⭐     | ⚡⚡         | Opcional        |
-| medium | 769 MB  | ⭐⭐⭐⭐⭐    | ⚡          | Recomendada     |
-| large-v3 | 1.5 GB | ⭐⭐⭐⭐⭐⭐   | ⚡          | Necessária      |
-
-**Recomendação**: `large-v3` para melhor qualidade (requer GPU)
-
-## 📊 Performance
-
-Benchmarks em arquivo de áudio de 5 minutos:
-
-| Configuração | Tempo | Precisão | GPU |
-|--------------|-------|----------|-----|
-| tiny (CPU)   | 45s   | 85%      | ❌  |
-| base (CPU)   | 2m    | 90%      | ❌  |
-| large-v3 (GPU) | 30s | 98%      | ✅  |
-
-## 🧪 Testes
-
-```bash
-# Instalar dependências de teste
-pip install pytest pytest-asyncio pytest-cov
-
-# Rodar testes
-pytest
-
-# Com coverage
-pytest --cov=app tests/
-
-# Benchmark
-python scripts/benchmark.py sample.wav
-```
-
-## 🐛 Troubleshooting
-
-### Erro: "CUDA not available"
-- Instale PyTorch com suporte CUDA
-- Configure `WHISPER_DEVICE=cpu` no .env
-
-### Erro: "pyannote.audio token required"
-- Obtenha token em: https://huggingface.co/settings/tokens
-- Configure `PYANNOTE_AUTH_TOKEN` no .env
-
-### Workers não processam jobs
-- Verifique se Redis está rodando
-- Verifique logs: `docker-compose logs worker-cpu`
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Por favor:
-
-1. Fork o projeto
-2. Crie sua feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Ver [LICENSE](LICENSE) para mais detalhes.
-
-## 👥 Autores
-
-- **Erick** - *Desenvolvedor Principal* - [@erick](https://github.com/erick)
-
-## 🙏 Agradecimentos
-
-- [OpenAI Whisper](https://github.com/openai/whisper)
-- [faster-whisper](https://github.com/guillaumekln/faster-whisper)
-- [pyannote.audio](https://github.com/pyannote/pyannote-audio)
-- [FastAPI](https://fastapi.tiangolo.com/)
-
-## 📞 Suporte
-
-- 📧 Email: support@transcritorai.com
-- 💬 Discord: [Join our community](https://discord.gg/transcritorai)
-- 🐛 Issues: [GitHub Issues](https://github.com/seu-usuario/transcritor-ai-pro/issues)
+Plataforma profissional de transcrição de áudio/vídeo usando OpenAI Whisper API com suporte a áudios longos, diarização de falantes e pós-processamento inteligente.
 
 ---
 
-Feito com ❤️ para a comunidade brasileira de desenvolvedores
+## 🚀 Stack Tecnológica
+
+- **Framework**: Next.js 16 (App Router)
+- **Autenticação**: Clerk
+- **Database**: PostgreSQL (Supabase)
+- **Storage**: Cloudflare R2
+- **AI**: OpenAI API (gpt-4o-transcribe)
+- **Estilo**: Tailwind CSS
+- **Deploy**: Vercel
+- **Analytics**: Vercel Analytics
+
+---
+
+## ✨ Funcionalidades
+
+- ✅ Upload de áudio/vídeo até 100MB
+- ✅ Transcrição via OpenAI Whisper API
+- ✅ Suporte a áudios longos (chunking automático a cada 20min)
+- ✅ Diarização de falantes (quem falou o quê)
+- ✅ Pós-processamento inteligente com GPT-4o
+- ✅ Múltiplos formatos de export (TXT, SRT, VTT, JSON)
+- ✅ Autenticação segura (Clerk)
+- ✅ Interface moderna e responsiva
+- ✅ Rate limiting (10 uploads/min por usuário)
+- ✅ Analytics integrado
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+transcriptioon-pro/
+├── frontend/                    # Aplicação Next.js completa
+│   ├── app/                    # App Router (Pages + API Routes)
+│   │   ├── (app)/             # Rotas protegidas por autenticação
+│   │   │   ├── upload/        # Página de upload
+│   │   │   ├── library/       # Biblioteca de transcrições
+│   │   │   ├── processing/    # Status de processamento
+│   │   │   ├── profile/       # Perfil do usuário
+│   │   │   └── song/[id]/     # Detalhes da transcrição
+│   │   ├── api/               # Backend (API Routes)
+│   │   │   └── transcriptions/
+│   │   │       ├── upload/    # Upload e processamento
+│   │   │       ├── [id]/      # Status e detalhes
+│   │   │       └── route.ts   # Listagem
+│   │   └── layout.tsx         # Layout raiz
+│   ├── components/ui/         # Componentes reutilizáveis
+│   ├── lib/                   # Utilitários e clients
+│   │   ├── openai-server.ts  # Cliente OpenAI + Chunking
+│   │   ├── r2-storage.ts     # Storage Cloudflare R2
+│   │   ├── rate-limit.ts     # Rate limiting
+│   │   └── prisma.ts         # Cliente Prisma (DB)
+│   ├── prisma/
+│   │   └── schema.prisma     # Schema do banco de dados
+│   ├── middleware.ts         # Clerk authentication
+│   ├── .env.example          # Template de variáveis
+│   └── package.json
+├── .gitignore
+├── README.md                  # Este arquivo
+├── DEPLOY_GUIDE.md           # Guia completo de deploy
+└── PRODUCTION_READY.md       # Checklist de produção
+```
+
+---
+
+## 🔧 Setup Local
+
+### Pré-requisitos
+
+- Node.js 20+
+- npm ou pnpm
+- **ffmpeg** instalado ([Download](https://ffmpeg.org/download.html))
+  ```bash
+  # Windows: Baixar e adicionar ao PATH
+  # Linux: sudo apt install ffmpeg
+  # Mac: brew install ffmpeg
+  ```
+
+### Instalação
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/seu-usuario/transcriptioon-pro.git
+cd transcriptioon-pro/frontend
+
+# 2. Instale as dependências
+npm install
+
+# 3. Configure as variáveis de ambiente
+cp .env.example .env.local
+# Edite .env.local com suas credenciais (veja seção abaixo)
+
+# 4. Configure o banco de dados
+npx prisma generate
+npx prisma db push
+
+# 5. Inicie o servidor
+npm run dev
+```
+
+Acesse: **http://localhost:3000**
+
+---
+
+## 🔐 Variáveis de Ambiente
+
+Crie `.env.local` em `/frontend` com:
+
+```env
+# Clerk Authentication (https://dashboard.clerk.com)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Database - Supabase PostgreSQL (https://supabase.com)
+# Use Session Pooler para IPv4
+DATABASE_URL="postgresql://postgres.xxx:senha@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
+
+# OpenAI API (https://platform.openai.com/api-keys)
+OPENAI_API_KEY=sk-proj-...
+
+# Cloudflare R2 Storage (https://dash.cloudflare.com)
+R2_ACCOUNT_ID=seu_account_id
+R2_ACCESS_KEY_ID=xxx
+R2_SECRET_ACCESS_KEY=xxx
+R2_BUCKET_NAME=lyricspro-audio
+R2_PUBLIC_URL=https://pub-xxx.r2.dev
+
+# App Config
+NEXT_PUBLIC_APP_NAME=LyricsPro
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+Veja `.env.example` para todos os detalhes.
+
+---
+
+## 🚀 Deploy em Produção
+
+### Deploy Rápido (Vercel)
+
+1. **Push para GitHub**
+   ```bash
+   git add .
+   git commit -m "feat: projeto completo"
+   git push
+   ```
+
+2. **Importar no Vercel**
+   - Acesse [vercel.com](https://vercel.com)
+   - New Project → Import Repository
+   - Root Directory: **frontend**
+   - Framework: Next.js (detecta automaticamente)
+
+3. **Adicionar Environment Variables**
+   - Copie todas as variáveis de `.env.local`
+   - Cole em: Project Settings → Environment Variables
+
+4. **Deploy!**
+
+**Para guia completo de produção**, veja:
+- [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) - Passo a passo detalhado
+- [PRODUCTION_READY.md](./PRODUCTION_READY.md) - Checklist e troubleshooting
+
+---
+
+## 📊 Como Funciona
+
+### Fluxo de Transcrição
+
+```
+1. Upload (Frontend)
+   ↓
+2. Salvar em R2 + Criar registro DB (API Route)
+   ↓
+3. Processamento em background:
+   - Verificar duração
+   - Se > 20min: dividir em chunks (ffmpeg)
+   - Transcrever cada chunk (OpenAI)
+   - Juntar resultados
+   ↓
+4. Pós-processamento (GPT-4o)
+   ↓
+5. Status → completed
+```
+
+### Chunking Automático
+
+Áudios > 20 minutos são divididos automaticamente:
+
+```typescript
+// lib/openai-server.ts
+async function splitAudioIntoChunks(filePath: string, chunkDuration: number = 1200) {
+  const duration = await getAudioDuration(filePath);
+
+  if (duration <= chunkDuration) {
+    return [filePath]; // Não precisa dividir
+  }
+
+  // Divide em chunks de 20min usando ffmpeg
+  // Processa cada um
+  // Junta com offset de timestamp
+}
+```
+
+---
+
+## 🛠️ Desenvolvimento
+
+### Comandos Úteis
+
+```bash
+# Desenvolvimento
+npm run dev
+
+# Build de produção
+npm run build
+npm start
+
+# Linting
+npm run lint
+
+# Prisma Studio (GUI do banco)
+npx prisma studio
+
+# Gerar Prisma Client
+npx prisma generate
+
+# Sync schema com DB
+npx prisma db push
+```
+
+### Estrutura de Código
+
+**Components** (`components/ui/`):
+- `Button`, `Card`, `Input` - Componentes base
+- `ProcessingStatus` - Status de transcrição com etapas
+- `LyricViewer` - Visualizador de texto
+- `Header`, `BottomNav` - Navegação
+
+**API Routes** (`app/api/transcriptions/`):
+- `upload/route.ts` - Upload + processamento
+- `[id]/route.ts` - Status e detalhes
+- `route.ts` - Listagem
+
+**Libraries** (`lib/`):
+- `openai-server.ts` - Cliente OpenAI + chunking
+- `r2-storage.ts` - Upload/download R2
+- `rate-limit.ts` - Rate limiting simples
+- `prisma.ts` - Cliente DB
+
+---
+
+## 📝 API Routes
+
+### POST /api/transcriptions/upload
+
+Upload de arquivo e início de transcrição.
+
+**Request:**
+```typescript
+FormData {
+  file: File                      // Arquivo de áudio/vídeo
+  language: string                // 'pt', 'en', 'es', etc
+  enable_diarization: boolean     // Separação de falantes
+  enable_post_processing: boolean // Correção com GPT-4o
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid-da-transcrição",
+  "status": "pending",
+  "progress": 0,
+  "created_at": "2025-01-14T..."
+}
+```
+
+### GET /api/transcriptions
+
+Lista transcrições do usuário autenticado.
+
+**Query Params:**
+- `limit`: número de itens (default: 50)
+- `offset`: paginação
+- `status`: filtrar por status (pending/processing/completed/failed)
+
+### GET /api/transcriptions/[id]
+
+Retorna status e detalhes da transcrição.
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "status": "completed",
+  "progress": 100,
+  "transcription_text": "Texto completo...",
+  "word_count": 1523,
+  "speaker_count": 2,
+  "segments": [...],
+  "chapters": [...]
+}
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### FFmpeg não encontrado
+```bash
+# Verificar instalação
+ffmpeg -version
+ffprobe -version
+
+# Se não encontrado:
+# Windows: Baixar de ffmpeg.org e adicionar ao PATH
+# Linux: sudo apt install ffmpeg
+# Mac: brew install ffmpeg
+```
+
+### Erro de conexão com banco
+```bash
+# Testar conexão
+psql "postgresql://postgres.xxx:senha@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
+
+# Verificar:
+# 1. Usando Session Pooler (não Direct Connection)
+# 2. Senha correta
+# 3. Supabase não tem firewall bloqueando
+```
+
+### Timeout no Vercel
+O Vercel tem limite de 60s para execução. Áudios longos podem dar timeout.
+
+**Solução temporária**: Áudios < 5min funcionam bem.
+**Solução definitiva**: Implementar worker assíncrono separado (ver PRODUCTION_READY.md).
+
+### Rate limit atingido
+```
+Erro 429: "Muitas requisições"
+```
+Limite: 10 uploads/minuto por usuário. Aguarde 1 minuto e tente novamente.
+
+---
+
+## 📈 Performance e Limites
+
+### Otimizações Implementadas
+
+- ✅ Chunking automático (áudios longos)
+- ✅ Rate limiting (proteção contra spam)
+- ✅ Cleanup de arquivos temporários
+- ✅ Connection pooling (Supabase)
+- ✅ Image optimization (Next.js)
+- ✅ Lazy loading de componentes
+
+### Limites Atuais
+
+| Item | Limite |
+|------|--------|
+| Tamanho do arquivo | 100MB |
+| Duração do áudio | Ilimitada (chunking automático) |
+| Uploads por minuto | 10 por usuário |
+| Timeout (Vercel) | 60 segundos ⚠️ |
+
+⚠️ **Nota**: Processamento síncrono pode causar timeout para áudios > 5min. Veja [PRODUCTION_READY.md](./PRODUCTION_READY.md) para solução.
+
+### Custos (Estimativa)
+
+| Serviço | Free Tier | Custo após |
+|---------|-----------|------------|
+| Vercel | 100GB bandwidth | $20/mês |
+| Supabase | 500MB DB + 1GB storage | $25/mês |
+| Cloudflare R2 | 10GB storage | $0.015/GB |
+| OpenAI API | Pay-as-you-go | ~$0.006-0.03/min |
+
+---
+
+## 🔒 Segurança
+
+- ✅ Autenticação obrigatória (Clerk)
+- ✅ Rate limiting por usuário
+- ✅ Validação de tipo e tamanho de arquivo
+- ✅ Sanitização de inputs
+- ✅ Variáveis de ambiente protegidas
+- ✅ CORS configurado
+- ✅ SQL injection protection (Prisma)
+
+---
+
+## 📚 Documentação Adicional
+
+- **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** - Guia completo de deploy e configuração
+- **[PRODUCTION_READY.md](./PRODUCTION_READY.md)** - Checklist de produção e melhorias
+
+---
+
+## 📄 Licença
+
+Proprietary - Todos os direitos reservados © 2025
+
+---
+
+## 👨‍💻 Autor
+
+**Erick** - Desenvolvedor Full Stack
+
+---
+
+**Desenvolvido com ❤️ usando Next.js, OpenAI e Vercel**

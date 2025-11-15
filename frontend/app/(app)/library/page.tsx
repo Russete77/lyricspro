@@ -37,15 +37,15 @@ export default function LibraryPage() {
         });
 
         // Mapear para formato Song
-        const songs: Song[] = response.items.map((t) => ({
+        const songs: Song[] = response.items.map((t: any) => ({
           id: t.id,
-          title: t.title || `Transcrição ${t.id.slice(0, 8)}`,
+          title: t.title || t.original_filename || `Transcrição ${t.id.slice(0, 8)}`,
           status: t.status as TranscriptionStatus,
           progress: t.progress || 0,
           duration: t.duration || null,
           created_at: t.created_at || new Date().toISOString(),
           completed_at: t.completed_at || null,
-          preview: t.preview ? t.preview.slice(0, 100) : null,
+          preview: t.preview ? t.preview.slice(0, 150) : null,
           chapters: [],
         }));
 

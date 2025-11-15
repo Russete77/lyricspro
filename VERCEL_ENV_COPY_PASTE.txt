@@ -1,0 +1,73 @@
+================================================================================
+VARIÁVEIS DE AMBIENTE PARA VERCEL - FORMATO COPIAR/COLAR
+================================================================================
+
+INSTRUÇÕES:
+Copie cada linha e cole direto na Vercel em formato "Nome=Valor"
+
+================================================================================
+VARIÁVEIS PRONTAS (Copie uma por vez)
+================================================================================
+
+DATABASE_URL="SUA_DATABASE_URL_DO_SUPABASE"
+
+OPENAI_API_KEY="SUA_OPENAI_API_KEY"
+
+R2_ACCOUNT_ID="SEU_R2_ACCOUNT_ID"
+
+R2_ACCESS_KEY_ID="SEU_R2_ACCESS_KEY_ID"
+
+R2_SECRET_ACCESS_KEY="SEU_R2_SECRET_ACCESS_KEY"
+
+R2_BUCKET_NAME="lyricspro-bucket"
+
+R2_PUBLIC_URL=""
+
+NEXT_PUBLIC_APP_NAME="LyricsPro"
+
+NEXT_PUBLIC_MAX_FILE_SIZE_MB="500"
+
+NEXT_PUBLIC_MAX_DURATION_MINUTES="120"
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="SUA_CLERK_PUBLISHABLE_KEY"
+
+CLERK_SECRET_KEY="SUA_CLERK_SECRET_KEY"
+
+TRIGGER_SECRET_KEY="SUA_TRIGGER_SECRET_KEY"
+
+================================================================================
+VARIÁVEIS PARA ADICIONAR DEPOIS DO DEPLOY
+================================================================================
+
+Substitua "seu-projeto-xxxx.vercel.app" pela URL real da Vercel:
+
+NEXT_PUBLIC_API_URL="https://seu-projeto-xxxx.vercel.app"
+
+NEXT_PUBLIC_APP_URL="https://seu-projeto-xxxx.vercel.app"
+
+================================================================================
+CHECKLIST
+================================================================================
+
+Total: 15 variáveis
+
+✅ Prontas agora (13):
+  □ DATABASE_URL
+  □ OPENAI_API_KEY
+  □ R2_ACCOUNT_ID
+  □ R2_ACCESS_KEY_ID
+  □ R2_SECRET_ACCESS_KEY
+  □ R2_BUCKET_NAME
+  □ R2_PUBLIC_URL
+  □ NEXT_PUBLIC_APP_NAME
+  □ NEXT_PUBLIC_MAX_FILE_SIZE_MB
+  □ NEXT_PUBLIC_MAX_DURATION_MINUTES
+  □ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  □ CLERK_SECRET_KEY
+  □ TRIGGER_SECRET_KEY
+
+⚠️ Depois (2):
+  □ NEXT_PUBLIC_API_URL
+  □ NEXT_PUBLIC_APP_URL
+
+================================================================================
