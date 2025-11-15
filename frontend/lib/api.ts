@@ -1,6 +1,6 @@
 /**
  * Cliente HTTP para comunicação com Next.js API Routes
- * Base URL: http://localhost:3000 (desenvolvimento)
+ * Usa URLs relativas para funcionar tanto em dev quanto em produção
  */
 
 import type {
@@ -14,7 +14,9 @@ import type {
   DownloadVTTResponse,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+// Em Next.js, API routes estão no mesmo domínio, então usamos URLs relativas
+// Isso funciona tanto em dev (localhost:3000) quanto em produção (vercel.app)
+const API_BASE_URL = "";
 
 /**
  * Helper para fazer requests HTTP

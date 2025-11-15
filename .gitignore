@@ -65,5 +65,8 @@ coverage/
 # Trigger.dev
 .trigger/
 
+# Credentials (local only)
+VERCEL_ENV_VARIABLES_REAIS.txt
+
 # Misc
 *.pem
