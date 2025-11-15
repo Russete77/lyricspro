@@ -24,6 +24,8 @@ export function getR2Client(): S3Client {
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
       },
+      // CRITICAL: Disable automatic checksums for browser compatibility
+      requestChecksumCalculation: 'WHEN_REQUIRED',
     });
   }
 
@@ -95,12 +97,15 @@ export async function getSignedUploadUrl(
     Bucket: bucketName,
     Key: key,
     ContentType: contentType,
+    // Explicitly disable checksums
+    ChecksumAlgorithm: undefined,
   });
 
-  // Gerar URL assinada sem checksums automáticos
+  // Generate presigned URL with minimal signed headers
   return await getSignedUrl(client, command, {
     expiresIn,
-    unhoistableHeaders: new Set(['x-amz-checksum-crc32']),
+    // Don't sign checksum headers
+    signableHeaders: new Set(['host', 'content-type']),
   });
 }
 
