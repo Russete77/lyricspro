@@ -3,7 +3,16 @@
  * Compatível com API S3
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import fs from 'fs';
 import path from 'path';
@@ -176,4 +185,110 @@ export async function uploadAndCleanup(
     console.error('[R2] Erro no upload:', error);
     throw error;
   }
+}
+
+// ============================================================================
+// Multipart Upload Functions
+// ============================================================================
+
+/**
+ * Inicia um multipart upload no R2
+ */
+export async function createMultipartUpload(
+  key: string,
+  contentType: string
+): Promise<{ uploadId: string; key: string }> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET_NAME!;
+
+  const command = new CreateMultipartUploadCommand({
+    Bucket: bucketName,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const response = await client.send(command);
+
+  if (!response.UploadId) {
+    throw new Error('Failed to create multipart upload');
+  }
+
+  console.log(`[R2 Multipart] Upload iniciado: ${key}, UploadId: ${response.UploadId}`);
+
+  return {
+    uploadId: response.UploadId,
+    key,
+  };
+}
+
+/**
+ * Gera presigned URL para upload de uma parte específica
+ */
+export async function getMultipartUploadUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  expiresIn: number = 3600
+): Promise<string> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET_NAME!;
+
+  const command = new UploadPartCommand({
+    Bucket: bucketName,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+  });
+
+  const url = await getSignedUrl(client, command, { expiresIn });
+
+  console.log(`[R2 Multipart] Presigned URL gerada para parte ${partNumber}`);
+
+  return url;
+}
+
+/**
+ * Completa o multipart upload
+ */
+export async function completeMultipartUpload(
+  key: string,
+  uploadId: string,
+  parts: Array<{ PartNumber: number; ETag: string }>
+): Promise<void> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET_NAME!;
+
+  const command = new CompleteMultipartUploadCommand({
+    Bucket: bucketName,
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: parts,
+    },
+  });
+
+  await client.send(command);
+
+  console.log(`[R2 Multipart] Upload completo: ${key}`);
+}
+
+/**
+ * Aborta um multipart upload (em caso de erro)
+ */
+export async function abortMultipartUpload(
+  key: string,
+  uploadId: string
+): Promise<void> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET_NAME!;
+
+  const command = new AbortMultipartUploadCommand({
+    Bucket: bucketName,
+    Key: key,
+    UploadId: uploadId,
+  });
+
+  await client.send(command);
+
+  console.log(`[R2 Multipart] Upload abortado: ${key}`);
 }

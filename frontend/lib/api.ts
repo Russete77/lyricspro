@@ -49,7 +49,8 @@ async function fetchAPI<T>(
 // ============================================================================
 
 /**
- * Upload de arquivo para transcrição
+ * Upload de arquivo para transcrição usando MULTIPART
+ * Suporta arquivos de qualquer tamanho (sem limite de 4.5MB da Vercel)
  */
 export async function uploadFile(
   file: File,
@@ -61,6 +62,32 @@ export async function uploadFile(
     webhook_url?: string;
     onProgress?: (progress: number) => void;
   } = {}
+): Promise<TranscriptionCreateResponse> {
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB por chunk
+  const FALLBACK_THRESHOLD = 4 * 1024 * 1024; // 4MB - usa upload tradicional se menor
+
+  // Se arquivo for pequeno (<4MB), usa upload tradicional (mais rápido)
+  if (file.size < FALLBACK_THRESHOLD) {
+    return uploadFileTraditional(file, options);
+  }
+
+  // Arquivo grande: usa multipart upload
+  return uploadFileMultipart(file, options, CHUNK_SIZE);
+}
+
+/**
+ * Upload tradicional (para arquivos pequenos <4MB)
+ */
+async function uploadFileTraditional(
+  file: File,
+  options: {
+    language?: string;
+    model_size?: string;
+    enable_diarization?: boolean;
+    enable_post_processing?: boolean;
+    webhook_url?: string;
+    onProgress?: (progress: number) => void;
+  }
 ): Promise<TranscriptionCreateResponse> {
   const formData = new FormData();
   formData.append("file", file);
@@ -77,11 +104,9 @@ export async function uploadFile(
     formData.append("webhook_url", options.webhook_url);
   }
 
-  // Upload com progresso (se suportado)
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    // Progress tracking
     if (options.onProgress) {
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
@@ -91,7 +116,6 @@ export async function uploadFile(
       });
     }
 
-    // Completion
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
@@ -110,17 +134,125 @@ export async function uploadFile(
       }
     });
 
-    xhr.addEventListener("error", () => {
-      reject(new Error("Network error"));
-    });
-
-    xhr.addEventListener("abort", () => {
-      reject(new Error("Upload aborted"));
-    });
+    xhr.addEventListener("error", () => reject(new Error("Network error")));
+    xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
 
     xhr.open("POST", `${API_BASE_URL}/api/transcriptions/upload`);
     xhr.send(formData);
   });
+}
+
+/**
+ * Upload multipart (para arquivos grandes >4MB)
+ */
+async function uploadFileMultipart(
+  file: File,
+  options: {
+    language?: string;
+    model_size?: string;
+    enable_diarization?: boolean;
+    enable_post_processing?: boolean;
+    onProgress?: (progress: number) => void;
+  },
+  chunkSize: number
+): Promise<TranscriptionCreateResponse> {
+  // Passo 1: Iniciar multipart upload
+  const startResponse = await fetchAPI<{
+    uploadId: string;
+    key: string;
+    chunkSize: number;
+  }>('/api/multipart/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type,
+      fileSize: file.size,
+    }),
+  });
+
+  const { uploadId, key } = startResponse;
+  const totalChunks = Math.ceil(file.size / chunkSize);
+  const uploadedParts: Array<{ PartNumber: number; ETag: string }> = [];
+
+  // Passo 2: Upload de cada chunk
+  for (let i = 0; i < totalChunks; i++) {
+    const partNumber = i + 1;
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, file.size);
+    const chunk = file.slice(start, end);
+
+    // Obter presigned URL para este chunk
+    const chunkResponse = await fetchAPI<{
+      uploadUrl: string;
+      partNumber: number;
+    }>('/api/multipart/chunk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key,
+        uploadId,
+        partNumber,
+      }),
+    });
+
+    // Upload do chunk direto para R2
+    const uploadResponse = await fetch(chunkResponse.uploadUrl, {
+      method: 'PUT',
+      body: chunk,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Failed to upload chunk ${partNumber}`);
+    }
+
+    // Pegar ETag do response
+    const etag = uploadResponse.headers.get('ETag');
+    if (!etag) {
+      throw new Error(`No ETag returned for chunk ${partNumber}`);
+    }
+
+    uploadedParts.push({
+      PartNumber: partNumber,
+      ETag: etag,
+    });
+
+    // Atualizar progresso (0-90% para upload dos chunks)
+    if (options.onProgress) {
+      const progress = ((i + 1) / totalChunks) * 90;
+      options.onProgress(progress);
+    }
+  }
+
+  // Passo 3: Completar multipart upload
+  if (options.onProgress) {
+    options.onProgress(95);
+  }
+
+  const completeResponse = await fetchAPI<TranscriptionCreateResponse>(
+    '/api/multipart/complete',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key,
+        uploadId,
+        parts: uploadedParts,
+        originalFilename: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        language: options.language || 'pt',
+        enableDiarization: options.enable_diarization || false,
+        enablePostProcessing: options.enable_post_processing !== false,
+      }),
+    }
+  );
+
+  if (options.onProgress) {
+    options.onProgress(100);
+  }
+
+  return completeResponse;
 }
 
 /**
