@@ -49,7 +49,7 @@ async function fetchAPI<T>(
 // ============================================================================
 
 /**
- * Upload de arquivo para transcrição
+ * Upload de arquivo para transcrição (UPLOAD DIRETO PARA R2)
  */
 export async function uploadFile(
   file: File,
@@ -62,65 +62,87 @@ export async function uploadFile(
     onProgress?: (progress: number) => void;
   } = {}
 ): Promise<TranscriptionCreateResponse> {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("language", options.language || "pt");
+  // Passo 1: Obter URL assinada para upload direto ao R2
+  const presignedResponse = await fetchAPI<{
+    uploadUrl: string;
+    r2Key: string;
+    expiresIn: number;
+  }>('/api/transcriptions/presigned-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type,
+      fileSize: file.size,
+    }),
+  });
 
-  if (options.model_size) {
-    formData.append("model_size", options.model_size);
-  }
+  const { uploadUrl, r2Key } = presignedResponse;
 
-  formData.append("enable_diarization", String(options.enable_diarization || false));
-  formData.append("enable_post_processing", String(options.enable_post_processing !== false));
-
-  if (options.webhook_url) {
-    formData.append("webhook_url", options.webhook_url);
-  }
-
-  // Upload com progresso (se suportado)
-  return new Promise((resolve, reject) => {
+  // Passo 2: Upload direto para R2 com progresso
+  await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
     // Progress tracking
     if (options.onProgress) {
-      xhr.upload.addEventListener("progress", (e) => {
+      xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
-          const progress = (e.loaded / e.total) * 100;
+          // Progresso do upload (0-90%)
+          const progress = (e.loaded / e.total) * 90;
           options.onProgress?.(progress);
         }
       });
     }
 
-    // Completion
-    xhr.addEventListener("load", () => {
+    xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
-        } catch (error) {
-          reject(new Error("Invalid JSON response"));
-        }
+        resolve();
       } else {
-        try {
-          const error = JSON.parse(xhr.responseText);
-          reject(new Error(error.detail || `HTTP ${xhr.status}`));
-        } catch {
-          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-        }
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
       }
     });
 
-    xhr.addEventListener("error", () => {
-      reject(new Error("Network error"));
+    xhr.addEventListener('error', () => {
+      reject(new Error('Network error during upload'));
     });
 
-    xhr.addEventListener("abort", () => {
-      reject(new Error("Upload aborted"));
+    xhr.addEventListener('abort', () => {
+      reject(new Error('Upload aborted'));
     });
 
-    xhr.open("POST", `${API_BASE_URL}/api/transcriptions/upload`);
-    xhr.send(formData);
+    // Upload direto para R2 usando presigned URL
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.send(file);
   });
+
+  // Passo 3: Confirmar upload e iniciar processamento
+  if (options.onProgress) {
+    options.onProgress(95);
+  }
+
+  const confirmResponse = await fetchAPI<TranscriptionCreateResponse>(
+    '/api/transcriptions/confirm-upload',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key,
+        originalFilename: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        language: options.language || 'pt',
+        enableDiarization: options.enable_diarization || false,
+        enablePostProcessing: options.enable_post_processing !== false,
+      }),
+    }
+  );
+
+  if (options.onProgress) {
+    options.onProgress(100);
+  }
+
+  return confirmResponse;
 }
 
 /**

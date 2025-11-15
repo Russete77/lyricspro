@@ -81,6 +81,58 @@ export async function getSignedDownloadUrl(key: string, expiresIn: number = 3600
 }
 
 /**
+ * Gerar URL assinada para UPLOAD direto do browser (presigned PUT)
+ */
+export async function getSignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresIn: number = 3600
+): Promise<string> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET_NAME!;
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  return await getSignedUrl(client, command, { expiresIn });
+}
+
+/**
+ * Baixar arquivo do R2 para caminho local temporário
+ */
+export async function downloadFromR2(key: string, localPath: string): Promise<void> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET_NAME!;
+
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+  });
+
+  const response = await client.send(command);
+
+  if (!response.Body) {
+    throw new Error('Empty response body from R2');
+  }
+
+  // Converter stream para buffer e salvar
+  const chunks: Uint8Array[] = [];
+  const stream = response.Body as any;
+
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+
+  const buffer = Buffer.concat(chunks);
+  fs.writeFileSync(localPath, buffer);
+
+  console.log(`[R2] Arquivo baixado: ${key} -> ${localPath}`);
+}
+
+/**
  * Deletar arquivo do R2
  */
 export async function deleteFromR2(key: string): Promise<void> {

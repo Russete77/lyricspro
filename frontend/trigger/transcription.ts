@@ -5,8 +5,12 @@
 
 import { schemaTask } from "@trigger.dev/sdk";
 import { z } from "zod";
+import path from "path";
+import fs from "fs";
+import { mkdir } from "fs/promises";
 import prisma from "@/lib/prisma";
 import { transcribeAudio, postProcessText } from "@/lib/openai-server";
+import { downloadFromR2 } from "@/lib/r2-storage";
 
 // Schema de validação do payload
 const TranscriptionPayloadSchema = z.object({
@@ -28,6 +32,8 @@ export const processTranscriptionTask = schemaTask({
 
     console.log(`[Trigger] Iniciando transcrição ${transcriptionId}`);
 
+    let localFilePath: string | null = null;
+
     try {
       // 1. Atualizar status para processing
       await prisma.transcription.update({
@@ -35,12 +41,22 @@ export const processTranscriptionTask = schemaTask({
         data: {
           status: 'processing',
           progress: 0,
-          currentStage: 'starting',
+          currentStage: 'downloading',
           startedAt: new Date(),
         },
       });
 
-      // 2. Progresso: 25%
+      // 2. Baixar arquivo do R2 para processamento local
+      const tempDir = path.join('/tmp', 'transcriptions');
+      await mkdir(tempDir, { recursive: true });
+
+      const ext = path.extname(filePath) || '.mp3';
+      localFilePath = path.join(tempDir, `${transcriptionId}${ext}`);
+
+      console.log(`[Trigger] Baixando arquivo do R2: ${filePath} -> ${localFilePath}`);
+      await downloadFromR2(filePath, localFilePath);
+
+      // 3. Progresso: 25%
       await prisma.transcription.update({
         where: { id: transcriptionId },
         data: {
@@ -51,8 +67,8 @@ export const processTranscriptionTask = schemaTask({
 
       console.log(`[Trigger] Transcrevendo áudio...`);
 
-      // 3. Transcrever com OpenAI
-      const transcriptionResult = await transcribeAudio(filePath, {
+      // 4. Transcrever com OpenAI
+      const transcriptionResult = await transcribeAudio(localFilePath, {
         language,
         enableDiarization,
       });
@@ -138,6 +154,16 @@ export const processTranscriptionTask = schemaTask({
       });
 
       throw error;
+    } finally {
+      // Limpar arquivo local temporário
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+          console.log(`[Trigger] Arquivo local removido: ${localFilePath}`);
+        } catch (cleanupError) {
+          console.error(`[Trigger] Erro ao remover arquivo local:`, cleanupError);
+        }
+      }
     }
   },
 });
