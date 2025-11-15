@@ -21,6 +21,11 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 export const maxDuration = 300; // 5 minutos
 export const dynamic = 'force-dynamic';
 
+// NOTA: O limite de body size é controlado pelo next.config.ts
+// experimental.proxyClientMaxBodySize: '500mb'
+// Vercel Free tem limite de 4.5MB, vai funcionar para arquivos pequenos
+// Para arquivos maiores, será necessário Vercel Pro ou implementar multipart upload
+
 export async function POST(request: NextRequest) {
   try {
     // Verificar autenticação
