@@ -64,20 +64,17 @@ export async function uploadFile(
   } = {}
 ): Promise<TranscriptionCreateResponse> {
   const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB por chunk
-  const MULTIPART_THRESHOLD = 50 * 1024 * 1024; // 50MB - só usa multipart se maior que isso
+  const MULTIPART_THRESHOLD = 4 * 1024 * 1024; // 4MB - Vercel body limit
 
-  // TEMPORÁRIO: Sempre usar upload tradicional para debug
-  // TODO: Descobrir por que multipart não funciona em produção
   console.log('[Upload] Tamanho do arquivo:', file.size, 'bytes');
   console.log('[Upload] Usando método:', file.size >= MULTIPART_THRESHOLD ? 'multipart' : 'tradicional');
 
-  // Se arquivo for pequeno (<50MB), usa upload tradicional via Vercel
-  // Nota: Vercel tem limite de 4.5MB no body, mas vamos tentar mesmo assim
+  // Se arquivo for pequeno (<4MB), usa upload tradicional via Vercel
   if (file.size < MULTIPART_THRESHOLD) {
     return uploadFileTraditional(file, options);
   }
 
-  // Arquivo muito grande (>50MB): usa multipart upload
+  // Arquivo grande (>=4MB): usa multipart upload direto para R2
   return uploadFileMultipart(file, options, CHUNK_SIZE);
 }
 
@@ -213,24 +210,41 @@ async function uploadFileMultipart(
     console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: fazendo upload para R2...`);
 
     // Upload do chunk direto para R2
-    const uploadResponse = await fetch(chunkResponse.uploadUrl, {
-      method: 'PUT',
-      body: chunk,
-    });
+    let etag: string;
+    try {
+      const uploadResponse = await fetch(chunkResponse.uploadUrl, {
+        method: 'PUT',
+        body: chunk,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+      });
 
-    if (!uploadResponse.ok) {
-      console.error(`[Multipart Client] Erro no chunk ${partNumber}:`, uploadResponse.status, uploadResponse.statusText);
-      throw new Error(`Failed to upload chunk ${partNumber}`);
+      console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: response status=${uploadResponse.status}`);
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text().catch(() => 'No error body');
+        console.error(`[Multipart Client] Erro no chunk ${partNumber}:`, {
+          status: uploadResponse.status,
+          statusText: uploadResponse.statusText,
+          body: errorText,
+        });
+        throw new Error(`Failed to upload chunk ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      }
+
+      // Pegar ETag do response
+      const responseEtag = uploadResponse.headers.get('ETag');
+      if (!responseEtag) {
+        console.error(`[Multipart Client] Sem ETag no chunk ${partNumber}`);
+        throw new Error(`No ETag returned for chunk ${partNumber}`);
+      }
+
+      etag = responseEtag;
+      console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: sucesso, ETag=${etag}`);
+    } catch (error) {
+      console.error(`[Multipart Client] Exceção no chunk ${partNumber}:`, error);
+      throw error;
     }
-
-    // Pegar ETag do response
-    const etag = uploadResponse.headers.get('ETag');
-    if (!etag) {
-      console.error(`[Multipart Client] Sem ETag no chunk ${partNumber}`);
-      throw new Error(`No ETag returned for chunk ${partNumber}`);
-    }
-
-    console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: sucesso, ETag=${etag}`);
 
     uploadedParts.push({
       PartNumber: partNumber,
