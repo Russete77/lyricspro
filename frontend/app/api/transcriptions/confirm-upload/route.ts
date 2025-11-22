@@ -15,6 +15,13 @@ export const dynamic = 'force-dynamic';
 // Usa Trigger.dev APENAS se a secret key estiver configurada (independente do ambiente)
 const USE_TRIGGER = Boolean(process.env.TRIGGER_SECRET_KEY);
 
+console.log('[Confirm Upload] Environment check:', {
+  hasTriggerKey: !!process.env.TRIGGER_SECRET_KEY,
+  triggerKeyPrefix: process.env.TRIGGER_SECRET_KEY?.substring(0, 10),
+  useTrigger: USE_TRIGGER,
+  nodeEnv: process.env.NODE_ENV,
+});
+
 export async function POST(request: NextRequest) {
   try {
     // Verificar autenticação
@@ -71,10 +78,14 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('[Confirm Upload] Registro criado:', transcription.id);
+    console.log('[Confirm Upload] Decidindo modo de processamento...', {
+      USE_TRIGGER,
+      hasTriggerKey: !!process.env.TRIGGER_SECRET_KEY,
+    });
 
     // Decidir processamento: Trigger.dev (produção) ou Local (desenvolvimento)
     if (USE_TRIGGER) {
-      console.log('[Confirm Upload] Modo: Trigger.dev (produção)');
+      console.log('[Confirm Upload] ✅ Modo: Trigger.dev (produção)');
 
       // Preparar payload para o Trigger.dev
       const payload = {
@@ -102,7 +113,7 @@ export async function POST(request: NextRequest) {
         throw triggerError;
       }
     } else {
-      console.log('[Confirm Upload] Modo: Processamento local (desenvolvimento)');
+      console.log('[Confirm Upload] ⚠️ Modo: Processamento local (desenvolvimento)');
 
       // Processar localmente em background
       startLocalProcessing(
