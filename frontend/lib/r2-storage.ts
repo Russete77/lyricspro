@@ -22,8 +22,23 @@ let r2Client: S3Client | null = null;
 
 export function getR2Client(): S3Client {
   if (!r2Client) {
+    // Debug: Log environment variables (sem expor valores completos)
+    console.log('[R2 Client] Verificando credenciais:', {
+      hasAccountId: !!process.env.R2_ACCOUNT_ID,
+      hasAccessKeyId: !!process.env.R2_ACCESS_KEY_ID,
+      hasSecretKey: !!process.env.R2_SECRET_ACCESS_KEY,
+      hasBucketName: !!process.env.R2_BUCKET_NAME,
+      bucketName: process.env.R2_BUCKET_NAME,
+      accountIdPrefix: process.env.R2_ACCOUNT_ID?.substring(0, 8),
+      accessKeyPrefix: process.env.R2_ACCESS_KEY_ID?.substring(0, 8),
+    });
+
     if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
-      throw new Error('R2 credentials not configured');
+      const missing = [];
+      if (!process.env.R2_ACCOUNT_ID) missing.push('R2_ACCOUNT_ID');
+      if (!process.env.R2_ACCESS_KEY_ID) missing.push('R2_ACCESS_KEY_ID');
+      if (!process.env.R2_SECRET_ACCESS_KEY) missing.push('R2_SECRET_ACCESS_KEY');
+      throw new Error(`R2 credentials not configured. Missing: ${missing.join(', ')}`);
     }
 
     r2Client = new S3Client({
@@ -36,6 +51,8 @@ export function getR2Client(): S3Client {
       // CRITICAL: Disable automatic checksums for browser compatibility
       requestChecksumCalculation: 'WHEN_REQUIRED',
     });
+
+    console.log('[R2 Client] Cliente S3 criado com sucesso');
   }
 
   return r2Client;
@@ -124,6 +141,8 @@ export async function getSignedUploadUrl(
 export async function downloadFromR2(key: string, localPath: string): Promise<void> {
   const client = getR2Client();
   const bucketName = process.env.R2_BUCKET_NAME!;
+
+  console.log(`[R2 Download] Bucket: ${bucketName}, Key: ${key}`);
 
   const command = new GetObjectCommand({
     Bucket: bucketName,
@@ -240,7 +259,13 @@ export async function getMultipartUploadUrl(
     PartNumber: partNumber,
   });
 
-  const url = await getSignedUrl(client, command, { expiresIn });
+  // Generate presigned URL with minimal signed headers for CORS compatibility
+  const url = await getSignedUrl(client, command, {
+    expiresIn,
+    // Don't sign unnecessary headers that might cause CORS issues
+    signableHeaders: new Set(['host']),
+    unhoistableHeaders: new Set(['x-amz-checksum-sha256']),
+  });
 
   console.log(`[R2 Multipart] Presigned URL gerada para parte ${partNumber}`);
 

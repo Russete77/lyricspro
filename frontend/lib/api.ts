@@ -64,14 +64,20 @@ export async function uploadFile(
   } = {}
 ): Promise<TranscriptionCreateResponse> {
   const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB por chunk
-  const FALLBACK_THRESHOLD = 4 * 1024 * 1024; // 4MB - usa upload tradicional se menor
+  const MULTIPART_THRESHOLD = 50 * 1024 * 1024; // 50MB - só usa multipart se maior que isso
 
-  // Se arquivo for pequeno (<4MB), usa upload tradicional (mais rápido)
-  if (file.size < FALLBACK_THRESHOLD) {
+  // TEMPORÁRIO: Sempre usar upload tradicional para debug
+  // TODO: Descobrir por que multipart não funciona em produção
+  console.log('[Upload] Tamanho do arquivo:', file.size, 'bytes');
+  console.log('[Upload] Usando método:', file.size >= MULTIPART_THRESHOLD ? 'multipart' : 'tradicional');
+
+  // Se arquivo for pequeno (<50MB), usa upload tradicional via Vercel
+  // Nota: Vercel tem limite de 4.5MB no body, mas vamos tentar mesmo assim
+  if (file.size < MULTIPART_THRESHOLD) {
     return uploadFileTraditional(file, options);
   }
 
-  // Arquivo grande: usa multipart upload
+  // Arquivo muito grande (>50MB): usa multipart upload
   return uploadFileMultipart(file, options, CHUNK_SIZE);
 }
 
@@ -156,6 +162,8 @@ async function uploadFileMultipart(
   },
   chunkSize: number
 ): Promise<TranscriptionCreateResponse> {
+  console.log('[Multipart Client] Iniciando upload:', { filename: file.name, size: file.size });
+
   // Passo 1: Iniciar multipart upload
   const startResponse = await fetchAPI<{
     uploadId: string;
@@ -171,16 +179,22 @@ async function uploadFileMultipart(
     }),
   });
 
+  console.log('[Multipart Client] Upload iniciado:', startResponse);
+
   const { uploadId, key } = startResponse;
   const totalChunks = Math.ceil(file.size / chunkSize);
   const uploadedParts: Array<{ PartNumber: number; ETag: string }> = [];
 
   // Passo 2: Upload de cada chunk
+  console.log(`[Multipart Client] Fazendo upload de ${totalChunks} chunks`);
+
   for (let i = 0; i < totalChunks; i++) {
     const partNumber = i + 1;
     const start = i * chunkSize;
     const end = Math.min(start + chunkSize, file.size);
     const chunk = file.slice(start, end);
+
+    console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: obtendo URL...`);
 
     // Obter presigned URL para este chunk
     const chunkResponse = await fetchAPI<{
@@ -196,6 +210,8 @@ async function uploadFileMultipart(
       }),
     });
 
+    console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: fazendo upload para R2...`);
+
     // Upload do chunk direto para R2
     const uploadResponse = await fetch(chunkResponse.uploadUrl, {
       method: 'PUT',
@@ -203,14 +219,18 @@ async function uploadFileMultipart(
     });
 
     if (!uploadResponse.ok) {
+      console.error(`[Multipart Client] Erro no chunk ${partNumber}:`, uploadResponse.status, uploadResponse.statusText);
       throw new Error(`Failed to upload chunk ${partNumber}`);
     }
 
     // Pegar ETag do response
     const etag = uploadResponse.headers.get('ETag');
     if (!etag) {
+      console.error(`[Multipart Client] Sem ETag no chunk ${partNumber}`);
       throw new Error(`No ETag returned for chunk ${partNumber}`);
     }
+
+    console.log(`[Multipart Client] Chunk ${partNumber}/${totalChunks}: sucesso, ETag=${etag}`);
 
     uploadedParts.push({
       PartNumber: partNumber,
@@ -224,10 +244,14 @@ async function uploadFileMultipart(
     }
   }
 
+  console.log('[Multipart Client] Todos os chunks foram enviados');
+
   // Passo 3: Completar multipart upload
   if (options.onProgress) {
     options.onProgress(95);
   }
+
+  console.log('[Multipart Client] Finalizando upload no R2...');
 
   const completeResponse = await fetchAPI<TranscriptionCreateResponse>(
     '/api/multipart/complete',
@@ -247,6 +271,8 @@ async function uploadFileMultipart(
       }),
     }
   );
+
+  console.log('[Multipart Client] Upload completo!', completeResponse);
 
   if (options.onProgress) {
     options.onProgress(100);
