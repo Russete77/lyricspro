@@ -2,8 +2,30 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+
+// Importar Clerk components dinamicamente apenas no cliente
+const UserButton = dynamic(
+  () => import('@clerk/nextjs').then(mod => mod.UserButton),
+  { ssr: false }
+);
+
+const SignedIn = dynamic(
+  () => import('@clerk/nextjs').then(mod => mod.SignedIn),
+  { ssr: false }
+);
+
+const SignedOut = dynamic(
+  () => import('@clerk/nextjs').then(mod => mod.SignedOut),
+  { ssr: false }
+);
+
+const SignInButton = dynamic(
+  () => import('@clerk/nextjs').then(mod => mod.SignInButton),
+  { ssr: false }
+);
 
 interface NavItem {
   href: string;
@@ -14,11 +36,18 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/upload', label: 'Upload' },
   { href: '/library', label: 'Biblioteca' },
   { href: '/processing', label: 'Processando' },
-  { href: '/profile', label: 'Perfil' },
+  { href: '/settings', label: 'Configurações' },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const [isElectron, setIsElectron] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    setIsElectron(typeof window !== 'undefined' && (window as any).electron?.isElectron);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 hidden lg:block bg-white/5 backdrop-blur-xl border-b border-white/10">
@@ -54,24 +83,26 @@ export function Header() {
           </nav>
 
           {/* User area */}
-          <div className="flex items-center gap-3">
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="px-5 py-2.5 rounded-xl font-medium text-white bg-brand-primary hover:bg-brand-primary/90 transition-all duration-300">
-                  Entrar
-                </button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-10 h-10",
-                  },
-                }}
-              />
-            </SignedIn>
-          </div>
+          {isClient && !isElectron && (
+            <div className="flex items-center gap-3">
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button className="px-5 py-2.5 rounded-xl font-medium text-white bg-brand-primary hover:bg-brand-primary/90 transition-all duration-300">
+                    Entrar
+                  </button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-10 h-10",
+                    },
+                  }}
+                />
+              </SignedIn>
+            </div>
+          )}
         </div>
       </div>
     </header>

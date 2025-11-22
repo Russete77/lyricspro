@@ -26,6 +26,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Detectar se está rodando no Electron (modo offline)
+  const isElectron = process.env.ELECTRON === 'true';
+
+  if (isElectron) {
+    // Modo Electron: sem autenticação
+    return (
+      <html lang="pt-BR" className={`${manrope.variable} ${inter.variable}`}>
+        <body className="font-sans antialiased">
+          {children}
+        </body>
+      </html>
+    );
+  }
+
+  // Modo Web: com autenticação Clerk
   return (
     <ClerkProvider>
       <html lang="pt-BR" className={`${manrope.variable} ${inter.variable}`}>

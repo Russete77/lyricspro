@@ -8,8 +8,13 @@ import { auth } from '@clerk/nextjs/server';
 import { completeMultipartUpload } from '@/lib/r2-storage';
 import prisma from '@/lib/prisma';
 import { processTranscriptionTask } from '@/trigger/transcription';
+import { startLocalProcessing } from '@/lib/local-transcription';
 
 export const dynamic = 'force-dynamic';
+
+// Detectar se deve usar Trigger.dev ou processamento local
+// Usa Trigger.dev APENAS se a secret key estiver configurada (independente do ambiente)
+const USE_TRIGGER = Boolean(process.env.TRIGGER_SECRET_KEY);
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,34 +88,48 @@ export async function POST(request: NextRequest) {
 
     console.log('[Multipart Complete] Registro criado:', transcription.id);
 
-    // Preparar payload para o Trigger.dev
-    const payload = {
-      transcriptionId: transcription.id,
-      filePath: key, // Passar a chave do R2
-      language,
-      enableDiarization,
-      enablePostProcessing,
-    };
+    // Decidir processamento: Trigger.dev (produção) ou Local (desenvolvimento)
+    if (USE_TRIGGER) {
+      console.log('[Multipart Complete] Modo: Trigger.dev (produção)');
 
-    console.log('[Multipart Complete] Disparando job do Trigger.dev...');
+      // Preparar payload para o Trigger.dev
+      const payload = {
+        transcriptionId: transcription.id,
+        filePath: key,
+        language,
+        enableDiarization,
+        enablePostProcessing,
+      };
 
-    // Disparar job do Trigger.dev
-    try {
-      const handle = await processTranscriptionTask.trigger(payload);
-      console.log('[Multipart Complete] Job disparado:', handle.id);
-    } catch (triggerError) {
-      console.error('[Multipart Complete] Erro ao disparar Trigger.dev:', triggerError);
+      try {
+        const handle = await processTranscriptionTask.trigger(payload);
+        console.log('[Multipart Complete] Job Trigger.dev disparado:', handle.id);
+      } catch (triggerError) {
+        console.error('[Multipart Complete] Erro ao disparar Trigger.dev:', triggerError);
 
-      // Marcar como failed no banco
-      await prisma.transcription.update({
-        where: { id: transcription.id },
-        data: {
-          status: 'failed',
-          errorMessage: 'Erro ao iniciar processamento',
-        },
-      });
+        await prisma.transcription.update({
+          where: { id: transcription.id },
+          data: {
+            status: 'failed',
+            errorMessage: 'Erro ao iniciar processamento',
+          },
+        });
 
-      throw triggerError;
+        throw triggerError;
+      }
+    } else {
+      console.log('[Multipart Complete] Modo: Processamento local (desenvolvimento)');
+
+      // Processar localmente em background
+      startLocalProcessing(
+        transcription.id,
+        key,
+        language,
+        enableDiarization,
+        enablePostProcessing
+      );
+
+      console.log('[Multipart Complete] Processamento local iniciado em background');
     }
 
     return NextResponse.json({

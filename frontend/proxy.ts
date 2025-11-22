@@ -39,6 +39,7 @@ export default clerkMiddleware(
           "'self'",
           'blob:',
           'data:',
+          'https://*.r2.cloudflarestorage.com',
         ],
         'img-src': [
           "'self'",

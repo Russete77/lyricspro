@@ -1,0 +1,44 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="100" fill="url(#bgGradient)"/>
+
+  <!-- Microphone/Sound wave icon -->
+  <g transform="translate(256, 256)">
+    <!-- Sound waves (stylized) -->
+    <path d="M -140 -80 Q -120 -100, -100 -80 T -60 -80" stroke="#60a5fa" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M -140 0 Q -120 -20, -100 0 T -60 0" stroke="#60a5fa" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <path d="M -140 80 Q -120 60, -100 80 T -60 80" stroke="#60a5fa" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.6"/>
+
+    <path d="M 140 -80 Q 120 -100, 100 -80 T 60 -80" stroke="#60a5fa" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M 140 0 Q 120 -20, 100 0 T 60 0" stroke="#60a5fa" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <path d="M 140 80 Q 120 60, 100 80 T 60 80" stroke="#60a5fa" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Central microphone -->
+    <rect x="-25" y="-70" width="50" height="90" rx="25" fill="white"/>
+    <rect x="-30" y="30" width="60" height="15" rx="7" fill="white"/>
+    <rect x="-3" y="45" width="6" height="40" fill="white"/>
+    <rect x="-35" y="85" width="70" height="8" rx="4" fill="white"/>
+
+    <!-- Accent dots (music notes style) -->
+    <circle cx="-15" cy="-50" r="5" fill="#1e40af"/>
+    <circle cx="15" cy="-30" r="5" fill="#1e40af"/>
+    <circle cx="0" cy="-10" r="5" fill="#1e40af"/>
+  </g>
+
+  <!-- Text: LyricsPro (simplified for icon) -->
+  <text x="256" y="440" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle" opacity="0.95">
+    LyricsPro
+  </text>
+</svg>

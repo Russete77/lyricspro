@@ -8,6 +8,7 @@ import { auth } from '@clerk/nextjs/server';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import prisma from '@/lib/prisma';
+import { getSignedDownloadUrl } from '@/lib/r2-storage';
 
 export async function GET(
   request: NextRequest,
@@ -53,7 +54,19 @@ export async function GET(
       );
     }
 
-    // Verificar se o arquivo existe
+    console.log('[Audio] Storage path:', transcription.storagePath);
+
+    // Verificar se o arquivo está no R2 (path começa com 'transcriptions/')
+    const isR2File = transcription.storagePath.startsWith('transcriptions/');
+    console.log('[Audio] Is R2 file:', isR2File);
+
+    if (isR2File) {
+      // Arquivo está no R2 - redirecionar para URL assinada
+      const signedUrl = await getSignedDownloadUrl(transcription.storagePath, 3600);
+      return NextResponse.redirect(signedUrl);
+    }
+
+    // Arquivo está local - ler do disco
     if (!existsSync(transcription.storagePath)) {
       return NextResponse.json(
         { error: 'Arquivo de áudio não encontrado' },

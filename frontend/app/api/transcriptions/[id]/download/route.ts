@@ -63,7 +63,7 @@ export async function GET(
             language: transcription.detectedLanguage || transcription.language,
             speaker_count: transcription.speakerCount,
             word_count: transcription.wordCount,
-            text: transcription.transcriptionText,
+            text: transcription.segments.map(seg => seg.text).join(' '), // Gerar a partir dos segments
             segments: transcription.segments.map((seg) => ({
               start: Number(seg.startTime),
               end: Number(seg.endTime),
@@ -81,7 +81,8 @@ export async function GET(
 
       case 'txt':
       default:
-        content = transcription.transcriptionText || '';
+        // Gerar texto a partir dos segments (mesma lógica da aba Editar)
+        content = transcription.segments.map(seg => seg.text).join(' ');
         contentType = 'text/plain';
         fileExtension = 'txt';
         break;

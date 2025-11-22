@@ -359,7 +359,14 @@ export default function SongDetailPage() {
           </CardHeader>
           <CardContent>
             <LyricViewer
-              lyrics={transcription.transcription_text || ''}
+              lyrics={
+                // Usar SEMPRE transcription_text que contém a letra pós-processada com estrutura
+                transcription.transcription_text ||
+                // Fallback: segments caso não tenha pós-processamento
+                (transcription.segments && transcription.segments.length > 0
+                  ? transcription.segments.map(seg => seg.text).join(' ')
+                  : '')
+              }
               editable={true}
               onEdit={(newLyrics) => {
                 // Atualizar o estado local imediatamente

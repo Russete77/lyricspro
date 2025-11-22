@@ -72,8 +72,21 @@ export async function POST(request: NextRequest) {
     const ext = filename.split('.').pop();
     const r2Key = `transcriptions/${userId}/${timestamp}.${ext}`;
 
+    console.log('[Multipart Start] Iniciando multipart upload no R2...', { r2Key });
+
     // Iniciar multipart upload no R2
-    const { uploadId, key } = await createMultipartUpload(r2Key, contentType);
+    let uploadId: string;
+    let key: string;
+
+    try {
+      const result = await createMultipartUpload(r2Key, contentType);
+      uploadId = result.uploadId;
+      key = result.key;
+      console.log('[Multipart Start] Upload iniciado com sucesso:', { uploadId, key });
+    } catch (r2Error) {
+      console.error('[Multipart Start] Erro ao criar multipart upload no R2:', r2Error);
+      throw new Error(`R2 multipart creation failed: ${r2Error instanceof Error ? r2Error.message : 'Unknown error'}`);
+    }
 
     console.log('[Multipart Start] Upload iniciado:', {
       userId,

@@ -32,6 +32,13 @@ export const processTranscriptionTask = schemaTask({
 
     console.log(`[Trigger] Iniciando transcrição ${transcriptionId}`);
 
+    // Validar API key da OpenAI antes de começar
+    const { validateOpenAIKey } = await import("@/lib/openai-server");
+    const validation = await validateOpenAIKey();
+    if (!validation.valid) {
+      throw new Error(`OpenAI API: ${validation.error}`);
+    }
+
     let localFilePath: string | null = null;
 
     try {
@@ -112,7 +119,10 @@ export const processTranscriptionTask = schemaTask({
           },
         });
 
-        const postProcessed = await postProcessText(transcriptionResult.text);
+        const postProcessed = await postProcessText(
+          transcriptionResult.text,
+          transcriptionResult.language
+        );
         finalText = postProcessed.text;
       }
 

@@ -21,6 +21,7 @@ const FFPROBE_PATH = ffprobeInstaller.path;
 
 // Singleton
 let openaiClient: OpenAI | null = null;
+let apiKeyValidated: boolean = false;
 
 export function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
@@ -36,6 +37,38 @@ export function getOpenAIClient(): OpenAI {
   }
 
   return openaiClient;
+}
+
+/**
+ * Valida se a API key da OpenAI está funcionando
+ */
+export async function validateOpenAIKey(): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const client = getOpenAIClient();
+
+    // Fazer uma request simples para validar a key
+    await client.models.list();
+
+    apiKeyValidated = true;
+    return { valid: true };
+  } catch (error: any) {
+    console.error('[OpenAI] Validação de API key falhou:', error);
+
+    if (error.status === 401) {
+      return { valid: false, error: 'API key inválida ou expirada' };
+    } else if (error.status === 429) {
+      return { valid: false, error: 'Limite de quota atingido' };
+    } else {
+      return { valid: false, error: error.message || 'Erro ao validar API key' };
+    }
+  }
+}
+
+/**
+ * Verifica se a API key já foi validada
+ */
+export function isAPIKeyValidated(): boolean {
+  return apiKeyValidated;
 }
 
 export interface TranscriptionOptions {
@@ -189,6 +222,9 @@ export async function transcribeAudio(
     const params: any = {
       file: fileStream,
       model,
+      // CRITICAL: Adicionar prompt para melhorar transcrição de músicas
+      // O prompt ajuda o Whisper a entender contexto e evitar repetições excessivas
+      prompt: 'This is a song with verses, chorus, and musical structure. Transcribe the lyrics accurately without repeating the same phrase excessively.',
     };
 
     // Adicionar idioma se não for auto
@@ -366,63 +402,139 @@ export async function transcribeAudio(
 }
 
 /**
- * Post-processa texto com GPT-4o
+ * Post-processa texto com GPT-4o (MULTILÍNGUE)
  */
-export async function postProcessText(text: string): Promise<{
+export async function postProcessText(
+  text: string,
+  detectedLanguage?: string
+): Promise<{
   text: string;
   summary?: string;
   topics?: string[];
 }> {
   const client = getOpenAIClient();
 
-  const prompt = `Você é um ESPECIALISTA em correção de transcrições de áudio em português brasileiro.
+  // Criar prompt baseado no idioma detectado
+  const isPortuguese = detectedLanguage?.startsWith('pt') || detectedLanguage === 'pt';
 
-OBJETIVO: Corrigir erros de transcrição mantendo 100% fidelidade à letra OFICIAL quando for música conhecida.
+  const prompt = isPortuguese
+    ? `Formate esta letra de música com estrutura profissional EM PORTUGUÊS.
 
-🎵 MÚSICAS CONHECIDAS - PRIORIDADE MÁXIMA:
-Se reconhecer uma música brasileira famosa, use a letra OFICIAL:
+FORMATO OBRIGATÓRIO - Use exatamente este padrão EM PORTUGUÊS:
 
-**SERTANEJO:**
-- Lamento Sertanejo (Dominguinhos/Gilberto Gil)
-- Chitãozinho & Xororó, Milionário & José Rico, Zezé Di Camargo & Luciano
-- Bruno & Marrone, Victor & Leo, Jorge & Mateus
+[Introdução]
+(sons instrumentais ou repetições iniciais)
 
-**MPB:**
-- Chico Buarque, Caetano Veloso, Gilberto Gil, Milton Nascimento
-- Elis Regina, Gal Costa, Maria Bethânia
+[Verso 1]
+Primeira linha
+Segunda linha
+...
 
-**SAMBA/PAGODE:**
-- Beth Carvalho, Zeca Pagodinho, Alcione, Martinho da Vila
+[Refrão]
+Linha do refrão
+...
 
-**OUTROS:**
-- Tim Maia, Djavan, Legião Urbana, Cazuza, Barão Vermelho
+[Verso 2]
+...
 
-REGRAS DE CORREÇÃO:
-1. ✅ **MÚSICAS CONHECIDAS**: Use a letra OFICIAL completa
-2. ✅ Corrija erros de transcrição (ex: "por ser de na" → "por ser de lá")
-3. ✅ Adicione pontuação e quebras de linha entre estrofes
-4. ✅ Capitalize início de versos
-5. ✅ Preserve sotaques regionais APENAS se não for música conhecida
-6. ❌ NÃO invente conteúdo se não reconhecer a música
+[Refrão]
 
-Texto transcrito:
+[Ponte]
+(se houver)
+
+[Final]
+...
+
+LETRA TRANSCRITA:
 ${text.substring(0, 120000)}
 
-Retorne APENAS o texto CORRIGIDO (letra oficial se for música conhecida), sem explicações ou comentários.`;
+CRÍTICO: SEMPRE use tags EM PORTUGUÊS: [Introdução], [Verso], [Refrão], [Ponte], [Final]. NÃO use inglês!`
+    : `Format this song lyrics with professional structure IN ENGLISH.
+
+REQUIRED FORMAT - Use exactly this pattern IN ENGLISH:
+
+[Intro]
+(instrumental sounds or initial repetitions)
+
+[Verse 1]
+First line
+Second line
+...
+
+[Chorus]
+Chorus line
+...
+
+[Verse 2]
+...
+
+[Chorus]
+
+[Bridge]
+(if exists)
+
+[Outro]
+...
+
+TRANSCRIBED LYRICS:
+${text.substring(0, 120000)}
+
+CRITICAL: ALWAYS use tags IN ENGLISH: [Intro], [Verse], [Chorus], [Bridge], [Outro]. Do NOT use Portuguese!`;
+
+  // Usar few-shot para forçar o formato NO IDIOMA CORRETO
+  const exampleInput = isPortuguese
+    ? 'Olhar Em algum lugar pra relaxar Eu vou pedir pros anjos cantarem por mim Pra quem tem fé A vida nunca tem fim'
+    : 'You can feel it in the streets On a day like this the heat I feel like summer';
+
+  const exampleOutput = isPortuguese
+    ? `[Introdução]
+(instrumental)
+
+[Verso 1]
+Olhar
+Em algum lugar pra relaxar
+
+[Refrão]
+Eu vou pedir pros anjos cantarem por mim
+Pra quem tem fé
+A vida nunca tem fim`
+    : `[Intro]
+(instrumental)
+
+[Verse 1]
+You can feel it in the streets
+On a day like this the heat
+
+[Chorus]
+I feel like summer`;
 
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     messages: [
       {
         role: 'system',
-        content: 'Você é um especialista em CORREÇÃO de transcrições automáticas.',
+        content: isPortuguese
+          ? 'Você formata letras de música com estrutura profissional usando tags EM PORTUGUÊS: [Introdução], [Verso], [Refrão], [Ponte], [Final].'
+          : 'You format song lyrics with professional structure using tags IN ENGLISH: [Intro], [Verse], [Chorus], [Bridge], [Outro].',
       },
+      // Few-shot example
+      {
+        role: 'user',
+        content: isPortuguese
+          ? `Formate esta letra:\n\n${exampleInput}`
+          : `Format this lyrics:\n\n${exampleInput}`,
+      },
+      {
+        role: 'assistant',
+        content: exampleOutput,
+      },
+      // Actual request
       {
         role: 'user',
         content: prompt,
       },
     ],
-    temperature: 0.1,
+    temperature: 0.2,
     max_tokens: 16000,
   });
 

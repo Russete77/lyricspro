@@ -7,8 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { processTranscriptionTask } from '@/trigger/transcription';
+import { startLocalProcessing } from '@/lib/local-transcription';
 
 export const dynamic = 'force-dynamic';
+
+// Detectar se deve usar Trigger.dev ou processamento local
+// Usa Trigger.dev APENAS se a secret key estiver configurada (independente do ambiente)
+const USE_TRIGGER = Boolean(process.env.TRIGGER_SECRET_KEY);
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,34 +72,48 @@ export async function POST(request: NextRequest) {
 
     console.log('[Confirm Upload] Registro criado:', transcription.id);
 
-    // Preparar payload para o Trigger.dev
-    const payload = {
-      transcriptionId: transcription.id,
-      filePath: r2Key, // Passar a chave do R2 em vez do caminho local
-      language,
-      enableDiarization,
-      enablePostProcessing,
-    };
+    // Decidir processamento: Trigger.dev (produção) ou Local (desenvolvimento)
+    if (USE_TRIGGER) {
+      console.log('[Confirm Upload] Modo: Trigger.dev (produção)');
 
-    console.log('[Confirm Upload] Disparando job do Trigger.dev...');
+      // Preparar payload para o Trigger.dev
+      const payload = {
+        transcriptionId: transcription.id,
+        filePath: r2Key,
+        language,
+        enableDiarization,
+        enablePostProcessing,
+      };
 
-    // Disparar job do Trigger.dev
-    try {
-      const handle = await processTranscriptionTask.trigger(payload);
-      console.log('[Confirm Upload] Job disparado:', handle.id);
-    } catch (triggerError) {
-      console.error('[Confirm Upload] Erro ao disparar Trigger.dev:', triggerError);
+      try {
+        const handle = await processTranscriptionTask.trigger(payload);
+        console.log('[Confirm Upload] Job Trigger.dev disparado:', handle.id);
+      } catch (triggerError) {
+        console.error('[Confirm Upload] Erro ao disparar Trigger.dev:', triggerError);
 
-      // Marcar como failed no banco
-      await prisma.transcription.update({
-        where: { id: transcription.id },
-        data: {
-          status: 'failed',
-          errorMessage: 'Erro ao iniciar processamento',
-        },
-      });
+        await prisma.transcription.update({
+          where: { id: transcription.id },
+          data: {
+            status: 'failed',
+            errorMessage: 'Erro ao iniciar processamento',
+          },
+        });
 
-      throw triggerError;
+        throw triggerError;
+      }
+    } else {
+      console.log('[Confirm Upload] Modo: Processamento local (desenvolvimento)');
+
+      // Processar localmente em background
+      startLocalProcessing(
+        transcription.id,
+        r2Key,
+        language,
+        enableDiarization,
+        enablePostProcessing
+      );
+
+      console.log('[Confirm Upload] Processamento local iniciado em background');
     }
 
     return NextResponse.json({
