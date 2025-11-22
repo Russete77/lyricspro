@@ -19,9 +19,10 @@ export default defineConfig({
   dirs: ["./trigger"],
   build: {
     extensions: [
-      // Prisma extension for Trigger.dev
+      // Prisma extension for Trigger.dev (legacy mode)
       prismaExtension({
         schema: "./prisma/schema.prisma",
+        mode: "legacy",
       }),
     ],
     external: [
