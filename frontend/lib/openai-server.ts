@@ -219,12 +219,11 @@ export async function transcribeAudio(
     const fileStream = fs.createReadStream(chunkPath);
 
     // Parâmetros base
+    // NOTA: NÃO usar prompt com Whisper pois ele pode "alucinar" o prompt
+    // quando não detecta fala clara no áudio
     const params: any = {
       file: fileStream,
       model,
-      // CRITICAL: Adicionar prompt para melhorar transcrição de músicas
-      // O prompt ajuda o Whisper a entender contexto e evitar repetições excessivas
-      prompt: 'This is a song with verses, chorus, and musical structure. Transcribe the lyrics accurately without repeating the same phrase excessively.',
     };
 
     // Adicionar idioma se não for auto
