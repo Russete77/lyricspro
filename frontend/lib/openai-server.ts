@@ -403,6 +403,8 @@ export async function transcribeAudio(
 
 /**
  * Post-processa texto com GPT-4o (MULTILÍNGUE)
+ * NOTA: O texto já foi transcrito pela API Whisper. Esta função apenas FORMATA
+ * e ORGANIZA o texto existente em seções musicais (verso, refrão, etc.)
  */
 export async function postProcessText(
   text: string,
@@ -417,96 +419,72 @@ export async function postProcessText(
   // Criar prompt baseado no idioma detectado
   const isPortuguese = detectedLanguage?.startsWith('pt') || detectedLanguage === 'pt';
 
+  // IMPORTANTE: Deixar CLARO que estamos apenas FORMATANDO texto já transcrito,
+  // não pedindo para transcrever ou reproduzir conteúdo protegido
   const prompt = isPortuguese
-    ? `Formate esta letra de música com estrutura profissional EM PORTUGUÊS.
+    ? `Você é um assistente de formatação de texto. O texto abaixo foi transcrito automaticamente por um sistema de reconhecimento de fala (Whisper ASR). Sua tarefa é APENAS organizar e formatar este texto em seções, adicionando marcadores de estrutura.
 
-FORMATO OBRIGATÓRIO - Use exatamente este padrão EM PORTUGUÊS:
+TAREFA: Organize o texto transcrito em seções usando marcadores. NÃO modifique o conteúdo, apenas adicione os marcadores de seção apropriados.
 
-[Introdução]
-(sons instrumentais ou repetições iniciais)
+MARCADORES A USAR (em português):
+- [Introdução] - para partes instrumentais ou repetições iniciais
+- [Verso 1], [Verso 2], etc. - para estrofes narrativas
+- [Refrão] - para partes que se repetem
+- [Ponte] - para transições musicais
+- [Final] - para a conclusão
 
-[Verso 1]
-Primeira linha
-Segunda linha
-...
-
-[Refrão]
-Linha do refrão
-...
-
-[Verso 2]
-...
-
-[Refrão]
-
-[Ponte]
-(se houver)
-
-[Final]
-...
-
-LETRA TRANSCRITA:
+TEXTO TRANSCRITO PARA FORMATAR:
 ${text.substring(0, 120000)}
 
-CRÍTICO: SEMPRE use tags EM PORTUGUÊS: [Introdução], [Verso], [Refrão], [Ponte], [Final]. NÃO use inglês!`
-    : `Format this song lyrics with professional structure IN ENGLISH.
+INSTRUÇÕES:
+1. Mantenha TODO o texto original
+2. Apenas adicione os marcadores de seção
+3. Separe as linhas de forma lógica
+4. Use marcadores EM PORTUGUÊS`
+    : `You are a text formatting assistant. The text below was automatically transcribed by a speech recognition system (Whisper ASR). Your task is ONLY to organize and format this text into sections by adding structure markers.
 
-REQUIRED FORMAT - Use exactly this pattern IN ENGLISH:
+TASK: Organize the transcribed text into sections using markers. Do NOT modify the content, only add appropriate section markers.
 
-[Intro]
-(instrumental sounds or initial repetitions)
+MARKERS TO USE (in English):
+- [Intro] - for instrumental parts or initial repetitions
+- [Verse 1], [Verse 2], etc. - for narrative stanzas
+- [Chorus] - for repeating parts
+- [Bridge] - for musical transitions
+- [Outro] - for the conclusion
 
-[Verse 1]
-First line
-Second line
-...
-
-[Chorus]
-Chorus line
-...
-
-[Verse 2]
-...
-
-[Chorus]
-
-[Bridge]
-(if exists)
-
-[Outro]
-...
-
-TRANSCRIBED LYRICS:
+TRANSCRIBED TEXT TO FORMAT:
 ${text.substring(0, 120000)}
 
-CRITICAL: ALWAYS use tags IN ENGLISH: [Intro], [Verse], [Chorus], [Bridge], [Outro]. Do NOT use Portuguese!`;
+INSTRUCTIONS:
+1. Keep ALL original text
+2. Only add section markers
+3. Separate lines logically
+4. Use markers IN ENGLISH`;
 
-  // Usar few-shot para forçar o formato NO IDIOMA CORRETO
+  // Few-shot example com texto genérico (não protegido por copyright)
   const exampleInput = isPortuguese
-    ? 'Olhar Em algum lugar pra relaxar Eu vou pedir pros anjos cantarem por mim Pra quem tem fé A vida nunca tem fim'
-    : 'You can feel it in the streets On a day like this the heat I feel like summer';
+    ? 'bom dia sol nascendo no horizonte mais um dia começando agora vou seguir em frente bom dia sol nascendo'
+    : 'good morning sun rising on the horizon another day is starting now I will move forward good morning sun rising';
 
   const exampleOutput = isPortuguese
     ? `[Introdução]
-(instrumental)
+bom dia sol nascendo no horizonte
 
 [Verso 1]
-Olhar
-Em algum lugar pra relaxar
+mais um dia começando
+agora vou seguir em frente
 
 [Refrão]
-Eu vou pedir pros anjos cantarem por mim
-Pra quem tem fé
-A vida nunca tem fim`
+bom dia sol nascendo`
     : `[Intro]
-(instrumental)
+good morning sun rising on the horizon
 
 [Verse 1]
-You can feel it in the streets
-On a day like this the heat
+another day is starting
+now I will move forward
 
 [Chorus]
-I feel like summer`;
+good morning sun rising`;
 
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
@@ -514,15 +492,15 @@ I feel like summer`;
       {
         role: 'system',
         content: isPortuguese
-          ? 'Você formata letras de música com estrutura profissional usando tags EM PORTUGUÊS: [Introdução], [Verso], [Refrão], [Ponte], [Final].'
-          : 'You format song lyrics with professional structure using tags IN ENGLISH: [Intro], [Verse], [Chorus], [Bridge], [Outro].',
+          ? 'Você é um assistente de formatação de texto. Sua função é organizar textos transcritos automaticamente em seções estruturadas, adicionando marcadores como [Introdução], [Verso], [Refrão], [Ponte], [Final]. Você NÃO modifica o conteúdo, apenas organiza e formata.'
+          : 'You are a text formatting assistant. Your function is to organize automatically transcribed texts into structured sections, adding markers like [Intro], [Verse], [Chorus], [Bridge], [Outro]. You do NOT modify the content, only organize and format.',
       },
       // Few-shot example
       {
         role: 'user',
         content: isPortuguese
-          ? `Formate esta letra:\n\n${exampleInput}`
-          : `Format this lyrics:\n\n${exampleInput}`,
+          ? `Formate este texto transcrito em seções:\n\n${exampleInput}`
+          : `Format this transcribed text into sections:\n\n${exampleInput}`,
       },
       {
         role: 'assistant',
