@@ -14,7 +14,10 @@ import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { processTranscriptionTask } from '@/trigger/transcription';
 import { uploadToR2 } from '@/lib/r2-storage';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+// Usar /tmp em produção (Vercel) e ./uploads em desenvolvimento
+const UPLOAD_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'uploads')
+  : path.join(process.cwd(), 'uploads');
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 // Configuração para aceitar arquivos grandes

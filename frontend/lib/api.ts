@@ -64,89 +64,18 @@ export async function uploadFile(
   } = {}
 ): Promise<TranscriptionCreateResponse> {
   const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB por chunk
-  const MULTIPART_THRESHOLD = 4 * 1024 * 1024; // 4MB - Vercel body limit
 
   console.log('[Upload] Tamanho do arquivo:', file.size, 'bytes');
-  console.log('[Upload] Usando método:', file.size >= MULTIPART_THRESHOLD ? 'multipart' : 'tradicional');
+  console.log('[Upload] Usando método: multipart (universal)');
 
-  // Se arquivo for pequeno (<4MB), usa upload tradicional via Vercel
-  if (file.size < MULTIPART_THRESHOLD) {
-    return uploadFileTraditional(file, options);
-  }
-
-  // Arquivo grande (>=4MB): usa multipart upload direto para R2
+  // SEMPRE usa multipart upload direto para R2
+  // Evita limite de 4MB do Vercel e garante consistência
   return uploadFileMultipart(file, options, CHUNK_SIZE);
 }
 
 /**
- * Upload tradicional (para arquivos pequenos <4MB)
- */
-async function uploadFileTraditional(
-  file: File,
-  options: {
-    language?: string;
-    model_size?: string;
-    enable_diarization?: boolean;
-    enable_post_processing?: boolean;
-    webhook_url?: string;
-    onProgress?: (progress: number) => void;
-  }
-): Promise<TranscriptionCreateResponse> {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("language", options.language || "pt");
-
-  if (options.model_size) {
-    formData.append("model_size", options.model_size);
-  }
-
-  formData.append("enable_diarization", String(options.enable_diarization || false));
-  formData.append("enable_post_processing", String(options.enable_post_processing !== false));
-
-  if (options.webhook_url) {
-    formData.append("webhook_url", options.webhook_url);
-  }
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    if (options.onProgress) {
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          const progress = (e.loaded / e.total) * 100;
-          options.onProgress?.(progress);
-        }
-      });
-    }
-
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
-        } catch (error) {
-          reject(new Error("Invalid JSON response"));
-        }
-      } else {
-        try {
-          const error = JSON.parse(xhr.responseText);
-          reject(new Error(error.detail || `HTTP ${xhr.status}`));
-        } catch {
-          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-        }
-      }
-    });
-
-    xhr.addEventListener("error", () => reject(new Error("Network error")));
-    xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
-
-    xhr.open("POST", `${API_BASE_URL}/api/transcriptions/upload`);
-    xhr.send(formData);
-  });
-}
-
-/**
- * Upload multipart (para arquivos grandes >4MB)
+ * Upload multipart universal (todos os tamanhos)
+ * Evita limite de 4MB do Vercel fazendo upload direto para R2
  */
 async function uploadFileMultipart(
   file: File,
